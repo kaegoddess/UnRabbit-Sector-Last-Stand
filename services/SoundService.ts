@@ -157,7 +157,7 @@ class SoundService {
     }
   }
 
-  public play(soundName: 'shoot' | 'impact' | 'footstep' | 'reload' | 'playerHit' | 'itemPickup') {
+  public play(soundName: 'shoot' | 'impact' | 'footstep' | 'reload' | 'playerHit' | 'itemPickup' | 'uiSelect') {
     // 컨텍스트가 없으면(초기화 안됨) 실행하지 않음
     if (!this.context) return;
     if (this.context.state === 'suspended') this.context.resume();
@@ -188,6 +188,9 @@ class SoundService {
       case 'itemPickup':
         this.synthItemPickup();
         break;
+      case 'uiSelect':
+        this.synthUiSelect();
+        break;
     }
   }
 
@@ -209,6 +212,32 @@ class SoundService {
   }
 
   // --- 신디사이저 (합성음) 로직 ---
+
+  /**
+   * UI 요소를 선택했을 때 재생될 짧고 날카로운 디지털 사운드를 생성합니다.
+   * '삐삑' 하는 느낌의 사운드로, 메뉴 선택과 같은 상호작용에 적합합니다.
+   */
+  private synthUiSelect() {
+    if (!this.context) return;
+    const t = this.context.currentTime;
+    const osc = this.context.createOscillator();
+    const gain = this.context.createGain();
+
+    // 'square' 파형은 '삐' 소리와 같은 날카롭고 디지털적인 사운드를 만듭니다.
+    osc.type = 'square';
+    // 높은 주파수(1200Hz)에서 시작하여 짧은 시간 동안 약간 떨어지면서 '삑'하는 느낌을 줍니다.
+    osc.frequency.setValueAtTime(1200, t);
+    osc.frequency.exponentialRampToValueAtTime(800, t + 0.1);
+
+    // 볼륨을 짧은 시간 동안 빠르게 줄여서 '클릭'처럼 소리가 바로 끊어지게 합니다.
+    gain.gain.setValueAtTime(SOUND_SETTINGS.masterVolume * 0.3, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+
+    osc.connect(gain);
+    gain.connect(this.context.destination);
+    osc.start(t);
+    osc.stop(t + 0.1); // 0.1초 후에 소리를 정지시켜 매우 짧게 만듭니다.
+  }
 
   // 아이템 획득 시 "뽀요용" 사운드
   private synthItemPickup() {

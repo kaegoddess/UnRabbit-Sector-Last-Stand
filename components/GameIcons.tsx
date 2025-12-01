@@ -3,15 +3,15 @@ import { GAME_TEXT } from '../textConfig';
 
 // 로딩 중일 때 보여줄 전술적 스캔 UI (캐릭터용, 텍스트 포함)
 export const TacticalLoader: React.FC<{ className?: string, text?: string }> = ({ className, text = GAME_TEXT.SYSTEM.RETRIEVING }) => (
-  <div className={`relative bg-gray-950 flex flex-col items-center justify-center overflow-hidden border border-green-900/50 ${className}`}>
+  // 이 컨테이너는 위치와 크기만 담당하며, 내부 콘텐츠는 각자 위치를 잡습니다.
+  <div className={`relative bg-gray-950 overflow-hidden border border-green-900/50 ${className}`}>
      {/* Grid Background */}
      <div className="absolute inset-0 bg-[linear-gradient(rgba(0,50,0,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(0,50,0,0.1)_1px,transparent_1px)] bg-[size:20px_20px]"></div>
 
-     {/* Scanline Animation */}
-     <div className="animate-scanline z-0"></div>
+     {/* Full Vertical Scan Animation - 이 라인은 App.tsx로 이동하여 항상 표시되도록 수정되었습니다. */}
 
      {/* Text */}
-     <div className="z-10 text-green-500 text-[10px] md:text-xs font-bold tracking-widest animate-pulse flex flex-col items-center gap-1">
+     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 text-green-500 text-[10px] md:text-xs font-bold tracking-widest animate-pulse flex flex-col items-center gap-1">
         <div className="w-2 h-2 bg-green-500 rounded-full mb-1"></div>
         <span>{text}</span>
         <span className="text-[8px] opacity-70">{GAME_TEXT.SYSTEM.ENCRYPTED}</span>
@@ -25,8 +25,7 @@ export const WeaponLoader: React.FC<{ className?: string }> = ({ className }) =>
      {/* Fine Grid Background */}
      <div className="absolute inset-0 bg-[linear-gradient(rgba(34,197,94,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(34,197,94,0.05)_1px,transparent_1px)] bg-[size:10px_10px]"></div>
 
-     {/* Gauge Fill Animation */}
-     <div className="animate-gauge-fill z-0"></div>
+     {/* Full Vertical Scan Animation - 이 라인은 App.tsx로 이동하여 항상 표시되도록 수정되었습니다. */}
 
      {/* Central Reticle / HUD Element */}
      <div className="z-10 relative flex flex-col items-center justify-center opacity-30">

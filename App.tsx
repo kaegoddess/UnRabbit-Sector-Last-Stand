@@ -87,18 +87,18 @@ const App: React.FC = () => {
   });
   const [missionText, setMissionText] = useState<string>("Initializing secure link...");
   const [gameOverText, setGameOverText] = useState<string>("");
-  const [loading, setLoading] = useState(false);
   const [finalReport, setFinalReport] = useState<{score: number, kills: number, wave: number} | null>(null);
-
-  const [charDefaultLoaded, setCharDefaultLoaded] = useState(false);
-  const [charMp5Loaded, setCharMp5Loaded] = useState(false);
-  const [charRifleLoaded, setCharRifleLoaded] = useState(false);
-  const [charShotgunLoaded, setCharShotgunLoaded] = useState(false);
-  const [m1911WeaponLoaded, setM1911WeaponLoaded] = useState(false);
-  const [mp5WeaponLoaded, setMp5WeaponLoaded] = useState(false);
-  const [rifleWeaponLoaded, setRifleWeaponLoaded] = useState(false);
-  const [shotgunWeaponLoaded, setShotgunWeaponLoaded] = useState(false);
   
+  // 메뉴 화면 이미지 로딩 상태 (무기별로 분리)
+  const [charLoaded, setCharLoaded] = useState(false);
+  const [weaponLoaded, setWeaponLoaded] = useState(false);
+  const [charMp5Loaded, setCharMp5Loaded] = useState(false);
+  const [weaponMp5Loaded, setWeaponMp5Loaded] = useState(false);
+  const [charRifleLoaded, setCharRifleLoaded] = useState(false);
+  const [weaponRifleLoaded, setWeaponRifleLoaded] = useState(false);
+  const [charShotgunLoaded, setCharShotgunLoaded] = useState(false);
+  const [weaponShotgunLoaded, setWeaponShotgunLoaded] = useState(false);
+
   // 업그레이드 창 이미지 로딩 상태
   const [upgradeWeaponLoaded, setUpgradeWeaponLoaded] = useState(false);
   const [loadedUpgradeIcons, setLoadedUpgradeIcons] = useState<Record<string, boolean>>({});
@@ -146,6 +146,50 @@ const App: React.FC = () => {
     );
   };
 
+  // 무기별 이미지와 로딩 상태를 관리하는 객체
+  const WEAPON_ASSETS = {
+      Pistol: {
+          char: ASSETS.CHAR_DEFAULT,
+          weapon: ASSETS.WEAPON_M1911,
+          Icon: PistolIcon,
+          upgradeImage: ASSETS.WEAPON_M1911,
+          charLoaded: charLoaded,
+          setCharLoaded: setCharLoaded,
+          weaponLoaded: weaponLoaded,
+          setWeaponLoaded: setWeaponLoaded,
+      },
+      MP5: {
+          char: ASSETS.CHAR_MP5,
+          weapon: ASSETS.WEAPON_MP5,
+          Icon: MP5Icon,
+          upgradeImage: ASSETS.WEAPON_MP5,
+          charLoaded: charMp5Loaded,
+          setCharLoaded: setCharMp5Loaded,
+          weaponLoaded: weaponMp5Loaded,
+          setWeaponLoaded: setWeaponMp5Loaded,
+      },
+      Rifle: {
+          char: ASSETS.CHAR_RIFLE,
+          weapon: ASSETS.WEAPON_RIFLE,
+          Icon: RifleIcon,
+          upgradeImage: ASSETS.WEAPON_RIFLE,
+          charLoaded: charRifleLoaded,
+          setCharLoaded: setCharRifleLoaded,
+          weaponLoaded: weaponRifleLoaded,
+          setWeaponLoaded: setWeaponRifleLoaded,
+      },
+      Shotgun: {
+          char: ASSETS.CHAR_SHOTGUN,
+          weapon: ASSETS.WEAPON_SHOTGUN,
+          Icon: ShotgunIcon,
+          upgradeImage: ASSETS.WEAPON_SHOTGUN,
+          charLoaded: charShotgunLoaded,
+          setCharLoaded: setCharShotgunLoaded,
+          weaponLoaded: weaponShotgunLoaded,
+          setWeaponLoaded: setWeaponShotgunLoaded,
+      }
+  };
+
   useEffect(() => {
     const preloadAssets = async () => {
       const baseAssetUrls = Object.values(ASSETS);
@@ -155,8 +199,8 @@ const App: React.FC = () => {
 
       const totalAssets = imageUrls.length;
       let loadedCount = 0;
-      const minTimePromise = new Promise<void>(resolve => setTimeout(resolve, 2500));
-
+      
+      // 이미지 로딩 프로미스 배열 생성
       const imagePromises = imageUrls.map(url => {
         return new Promise<void>((resolve) => {
           const img = new Image();
@@ -174,7 +218,9 @@ const App: React.FC = () => {
           };
         });
       });
-      await Promise.all([Promise.all(imagePromises), minTimePromise]);
+      
+      // [수정] 인위적인 최소 로딩 시간을 제거하고 실제 이미지 로딩만 기다립니다.
+      await Promise.all(imagePromises);
       setIsLoadingAssets(false);
     };
     preloadAssets();
@@ -184,11 +230,8 @@ const App: React.FC = () => {
   // (미션 텍스트 생성, 사운드 로드, 업그레이드 초기화)
   useEffect(() => {
     if (gameStatus === GameStatus.MENU) {
-      setLoading(true);
-      setTimeout(() => {
-        setMissionText(getRandomText(GAME_TEXT.MISSION_BRIEFINGS));
-        setLoading(false);
-      }, 500 + Math.random() * 500);
+      // [수정] "신호 해독 중..." 애니메이션을 위한 인위적인 지연 시간 제거
+      setMissionText(getRandomText(GAME_TEXT.MISSION_BRIEFINGS));
       
       soundService.loadCustomSoundsFromStorage();
       
@@ -317,14 +360,12 @@ const App: React.FC = () => {
   const handleGameOver = (finalScore: number, kills: number, wave: number) => {
     setGameStatus(GameStatus.GAME_OVER);
     setFinalReport({ score: finalScore, kills, wave });
-    setGameOverText(GAME_TEXT.GAME_OVER.CONNECTION_LOST);
 
-    setTimeout(() => {
-      const messagePool = finalScore >= 500 ? GAME_TEXT.HIGH_SCORE_REPORTS : GAME_TEXT.LOW_SCORE_REPORTS;
-      const flavorText = getRandomText(messagePool);
-      const report = `${flavorText} (최종 점수: ${finalScore}, 처치: ${kills})`;
-      setGameOverText(report);
-    }, 200);
+    // [수정] 인위적인 지연 시간을 제거하고, 게임 오버 즉시 최종 보고서 내용을 설정합니다.
+    const messagePool = finalScore >= 500 ? GAME_TEXT.HIGH_SCORE_REPORTS : GAME_TEXT.LOW_SCORE_REPORTS;
+    const flavorText = getRandomText(messagePool);
+    const report = `${flavorText} (최종 점수: ${finalScore}, 처치: ${kills})`;
+    setGameOverText(report);
   };
 
   const handleUpdateStats = (newStats: { health: number; ammo: number; maxAmmo: number; score: number; wave: number; xp: number; maxXp: number; level: number }) => {
@@ -392,6 +433,20 @@ const App: React.FC = () => {
         [part]: prev[part] + 1
     }));
     setGameStatus(GameStatus.PLAYING); // 게임 재개
+  };
+
+  /**
+   * 메뉴에서 무기를 선택했을 때 호출되는 핸들러입니다.
+   * @param key 선택된 무기의 고유 키 (예: 'Pistol', 'MP5')
+   */
+  const handleSelectWeapon = (key: keyof typeof WEAPONS) => {
+    // 이미 선택된 무기를 다시 클릭하면 아무것도 하지 않습니다.
+    if (selectedWeaponKey === key) return;
+
+    // 선택된 무기 상태를 업데이트합니다.
+    setSelectedWeaponKey(key);
+    // UI 선택 사운드를 재생합니다.
+    soundService.play('uiSelect');
   };
   
   // --- 업그레이드 화면 개발자 모드 함수 ---
@@ -631,50 +686,6 @@ export const GAME_OVER_UI_SETTINGS = {
     return renderLoadingScreen();
   }
     
-  // 무기별 이미지와 로딩 상태를 관리하는 객체
-  const WEAPON_ASSETS = {
-      Pistol: {
-          char: ASSETS.CHAR_DEFAULT,
-          weapon: ASSETS.WEAPON_M1911,
-          charLoaded: charDefaultLoaded,
-          weaponLoaded: m1911WeaponLoaded,
-          setCharLoaded: setCharDefaultLoaded,
-          setWeaponLoaded: setM1911WeaponLoaded,
-          Icon: PistolIcon,
-          upgradeImage: ASSETS.WEAPON_M1911,
-      },
-      MP5: {
-          char: ASSETS.CHAR_MP5,
-          weapon: ASSETS.WEAPON_MP5,
-          charLoaded: charMp5Loaded,
-          weaponLoaded: mp5WeaponLoaded,
-          setCharLoaded: setCharMp5Loaded,
-          setWeaponLoaded: setMp5WeaponLoaded,
-          Icon: MP5Icon,
-          upgradeImage: ASSETS.WEAPON_MP5,
-      },
-      Rifle: {
-          char: ASSETS.CHAR_RIFLE,
-          weapon: ASSETS.WEAPON_RIFLE,
-          charLoaded: charRifleLoaded,
-          weaponLoaded: rifleWeaponLoaded,
-          setCharLoaded: setCharRifleLoaded,
-          setWeaponLoaded: setRifleWeaponLoaded,
-          Icon: RifleIcon,
-          upgradeImage: ASSETS.WEAPON_RIFLE,
-      },
-      Shotgun: {
-          char: ASSETS.CHAR_SHOTGUN,
-          weapon: ASSETS.WEAPON_SHOTGUN,
-          charLoaded: charShotgunLoaded,
-          weaponLoaded: shotgunWeaponLoaded,
-          setCharLoaded: setCharShotgunLoaded,
-          setWeaponLoaded: setShotgunWeaponLoaded,
-          Icon: ShotgunIcon,
-          upgradeImage: ASSETS.WEAPON_SHOTGUN,
-      }
-  };
-  
   const currentWeaponAsset = WEAPON_ASSETS[selectedWeaponKey];
 
   // 업그레이드 화면 위치 데이터 (개발자 모드 여부에 따라 결정)
@@ -1093,14 +1104,16 @@ export const GAME_OVER_UI_SETTINGS = {
           <div className="max-w-[90vw] w-full p-8 bg-[#111827] bg-[linear-gradient(rgba(34,197,94,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(34,197,94,0.1)_1px,transparent_1px)] bg-[size:30px_30px] shadow-[0_0_50px_rgba(34,197,94,0.2)] rounded-lg flex flex-col md:flex-row gap-8 items-stretch h-[80vh]">
             <div className="md:w-[45%] flex flex-col h-full">
               <div className="relative border-2 border-green-700 bg-black h-full overflow-hidden rounded group flex-1">
-                  {!currentWeaponAsset.charLoaded && (<TacticalLoader className="absolute inset-0 w-full h-full z-30" text={GAME_TEXT.MENU.SCAN_BIOMETRICS} />)}
+                  {!currentWeaponAsset.charLoaded && <TacticalLoader className="absolute inset-0 z-20" />}
+                  {/* [수정] 스캔 애니메이션을 로딩 상태와 관계없이 항상 표시합니다. z-index를 15로 설정하여 이미지(10)보다는 위, 텍스트 오버레이(20)보다는 아래에 위치시킵니다. */}
+                  <div className="animate-scan pointer-events-none" style={{ zIndex: 15 }}></div>
                   {Object.entries(WEAPON_ASSETS).map(([key, asset]) => (
                       <img 
                           key={key}
                           src={asset.char} 
                           alt={GAME_TEXT.MENU.CHAR_NAME} 
-                          onLoad={() => asset.setCharLoaded(true)} 
                           className={`absolute inset-0 w-full h-full object-cover object-[40%_50%] transition-opacity duration-300 ${selectedWeaponKey === key ? 'opacity-100 z-10' : 'opacity-0 z-0'}`} 
+                          onLoad={() => asset.setCharLoaded(true)}
                       />
                   ))}
                   <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-6 pt-24 z-20 pointer-events-none">
@@ -1121,9 +1134,7 @@ export const GAME_OVER_UI_SETTINGS = {
                           <span className="text-xs text-green-100 font-bold tracking-widest bg-green-900/50 px-2 py-0.5 rounded-sm">{GAME_TEXT.MENU.INCOMING_TRANS}</span>
                       </div>
                       <div className="p-4 flex-1 overflow-y-auto font-body">
-                      {loading ? (
-                          <div className="animate-pulse flex items-center gap-2"><span className="inline-block w-2 h-2 bg-green-500 rounded-full animate-ping"></span>{GAME_TEXT.MENU.DECODING}</div>
-                      ) : (<p className="typing-effect leading-relaxed text-sm lg:text-base">{missionText}</p>)}
+                        <p className="typing-effect leading-relaxed text-sm lg:text-base">{missionText}</p>
                       </div>
                   </div>
               </div>
@@ -1135,26 +1146,20 @@ export const GAME_OVER_UI_SETTINGS = {
                       {Object.entries(WEAPONS).map(([key, weapon]) => {
                           const assetInfo = WEAPON_ASSETS[key as keyof typeof WEAPONS];
                           const isSelected = selectedWeaponKey === key;
-                          const isLoading = !assetInfo.weaponLoaded;
-
+                          
                           const slotClasses = isSelected
                               ? 'border-green-500 bg-green-900/20 shadow-[0_0_15px_rgba(34,197,94,0.3)]'
-                              : isLoading
-                                  ? 'border-gray-700 bg-gray-900'
-                                  : 'border-gray-700 bg-gray-900 opacity-60';
+                              : 'border-gray-700 bg-gray-900 opacity-60';
 
                           return (
                               <div
                                   key={key}
-                                  onClick={() => setSelectedWeaponKey(key as keyof typeof WEAPONS)}
+                                  onClick={() => handleSelectWeapon(key as keyof typeof WEAPONS)}
                                   className={`relative h-full border-2 rounded flex flex-col cursor-pointer transition-all hover:bg-gray-800 overflow-hidden ${slotClasses}`}
                               >
-                                  {/* 로딩 이미지를 절대 위치로 배치하여 전체를 덮도록 함 (z-50) */}
-                                  {!assetInfo.weaponLoaded && (
-                                      <div className="absolute inset-0 z-50 w-full h-full bg-gray-900">
-                                          <WeaponLoader className="w-full h-full" />
-                                      </div>
-                                  )}
+                                  {!assetInfo.weaponLoaded && <WeaponLoader className="absolute inset-0" />}
+                                  {/* [수정] 스캔 애니메이션을 로딩 상태와 관계없이 항상 표시합니다. z-index를 5로 설정하고 pointer-events-none을 추가하여 클릭을 방해하지 않도록 합니다. */}
+                                  <div className="animate-scan pointer-events-none" style={{ zIndex: 5 }}></div>
                                   
                                   {/* 내부 콘텐츠 컨테이너 (패딩 적용) */}
                                   <div className="flex flex-col w-full h-full p-2">
@@ -1166,8 +1171,8 @@ export const GAME_OVER_UI_SETTINGS = {
                                           <img 
                                               src={assetInfo.weapon} 
                                               alt={weapon.name} 
-                                              className={`w-full h-full object-contain drop-shadow-lg transition-opacity duration-300 ${assetInfo.weaponLoaded ? 'opacity-100' : 'opacity-0'}`} 
-                                              onLoad={() => assetInfo.setWeaponLoaded(true)} 
+                                              className={`w-full h-full object-contain drop-shadow-lg transition-opacity duration-300 ${assetInfo.weaponLoaded ? 'opacity-100' : 'opacity-0'}`}
+                                              onLoad={() => assetInfo.setWeaponLoaded(true)}
                                           />
                                       </div>
                                       

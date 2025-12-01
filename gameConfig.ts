@@ -19,6 +19,7 @@ export const SOUND_SETTINGS = {
     reload: 'sound/reload.mp3', 
     playerHit: 'sound/player_hit.mp3',
     itemPickup: 'sound/pickup.mp3', // 아이템 획득 사운드 파일 경로
+    uiSelect: 'sound/reload.mp3', // UI 선택 효과음. 파일이 없으므로 합성음이 재생됩니다.
   }
 };
 
