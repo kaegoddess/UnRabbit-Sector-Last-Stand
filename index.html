@@ -77,13 +77,14 @@
   "imports": {
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
     "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0"
+    "react": "https://aistudiocdn.com/react@^19.2.0"
   }
 }
 </script>
 </head>
   <body>
     <div id="root"></div>
+    <!-- 모든 앱 코드가 포함된 번들 파일을 불러옵니다. 'defer'는 HTML 로딩이 끝난 후 실행되도록 합니다. -->
+    <script src="./bundle.js" defer></script>
   </body>
 </html>
