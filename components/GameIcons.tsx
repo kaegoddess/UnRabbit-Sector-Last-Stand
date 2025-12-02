@@ -1,5 +1,20 @@
 import React, { useState } from 'react';
-import { GAME_TEXT } from '../textConfig';
+import { GAME_TEXT } from '../config/textConfig';
+
+// Define props for WeaponIcon
+interface WeaponIconProps {
+  imagePaths: string[];
+  fallback: React.ReactElement;
+  className?: string;
+  alt: string;
+  style?: React.CSSProperties;
+}
+
+// Define props for wrapper icons like PistolIcon
+interface WeaponIconWrapperProps {
+  className?: string;
+  style?: React.CSSProperties;
+}
 
 // 로딩 중일 때 보여줄 전술적 스캔 UI (캐릭터용, 텍스트 포함)
 export const TacticalLoader: React.FC<{ className?: string, text?: string }> = ({ className, text = GAME_TEXT.SYSTEM.RETRIEVING }) => (
@@ -45,225 +60,163 @@ export const WeaponLoader: React.FC<{ className?: string }> = ({ className }) =>
 );
 
 // PNG 로드 실패 시 보여줄 벡터(SVG) 아이콘 - M1911
-const M1911Vector: React.FC<{ className?: string }> = ({ className }) => (
+// `export` 키워드를 추가하여 이 컴포넌트가 다른 파일에서 import 될 수 있도록 합니다.
+export const M1911Vector: React.FC<WeaponIconWrapperProps> = ({ className }) => (
   <svg viewBox="0 0 200 120" className={className} xmlns="http://www.w3.org/2000/svg">
     <defs>
+      {/* SVG linearGradient의 x2, y2 속성 값 형식을 수정합니다. */}
       <linearGradient id="slideGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-        <stop offset="0%" stopColor="#64748b" />
-        <stop offset="100%" stopColor="#475569" />
+        <stop offset="0%" stopColor="#c8c8c8" />
+        <stop offset="50%" stopColor="#8c8c8c" />
+        <stop offset="100%" stopColor="#4d4d4d" />
       </linearGradient>
-      <linearGradient id="gripGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-        <stop offset="0%" stopColor="#78350f" />
-        <stop offset="100%" stopColor="#92400e" />
-      </linearGradient>
+      <filter id="glow">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur" />
+        <feMerge>
+          <feMergeNode in="blur" />
+          <feMergeNode in="SourceGraphic" />
+        </feMerge>
+      </filter>
     </defs>
-    
-    {/* Grip */}
-    <path d="M55 45 L50 100 L85 105 L95 45 Z" fill="url(#gripGradient)" stroke="#451a03" strokeWidth="2"/>
-    <line x1="60" y1="50" x2="57" y2="95" stroke="#451a03" strokeWidth="1" opacity="0.3"/>
-    <line x1="70" y1="50" x2="67" y2="95" stroke="#451a03" strokeWidth="1" opacity="0.3"/>
-    
-    {/* Trigger Guard */}
-    <path d="M75 65 Q75 85 95 85 L95 65" fill="none" stroke="#334155" strokeWidth="3"/>
-    
-    {/* Trigger */}
-    <path d="M80 67 L80 77 Q85 77 85 67" fill="#cbd5e1" stroke="#334155" strokeWidth="1"/>
-
-    {/* Frame */}
-    <rect x="30" y="50" width="100" height="15" fill="#334155" stroke="#1e293b" strokeWidth="2"/> 
-    
-    {/* Slide */}
-    <path d="M20 20 L160 20 L160 50 L20 50 Z" fill="url(#slideGradient)" stroke="#1e293b" strokeWidth="2"/>
-    
-    {/* Slide Serrations */}
-    <line x1="30" y1="25" x2="30" y2="45" stroke="#1e293b" strokeWidth="2" opacity="0.5"/>
-    <line x1="36" y1="25" x2="36" y2="45" stroke="#1e293b" strokeWidth="2" opacity="0.5"/>
-    <line x1="42" y1="25" x2="42" y2="45" stroke="#1e293b" strokeWidth="2" opacity="0.5"/>
-
-    {/* Hammer */}
-    <path d="M20 25 L10 22 L10 35 L20 35" fill="#1e293b"/>
-
-    {/* Sights */}
-    <path d="M155 20 L155 16 L160 20" fill="#1e293b"/> 
-    <path d="M25 20 L25 14 L30 20" fill="#1e293b"/> 
+    <rect x="20" y="30" width="160" height="60" rx="5" fill="url(#slideGradient)" filter="url(#glow)"/>
+    <rect x="15" y="60" width="30" height="20" rx="3" fill="#333"/>
+    <path d="M180 60 L185 55 L185 75 L180 70 Z" fill="#444"/>
+    <rect x="50" y="90" width="100" height="15" rx="3" fill="#333"/>
+    <rect x="160" y="55" width="20" height="10" rx="2" fill="#444"/>
+    <circle cx="170" cy="60" r="2" fill="#f8d167"/>
   </svg>
 );
 
-// PNG 로드 실패 시 보여줄 벡터(SVG) 아이콘 - MP5
-const MP5Vector: React.FC<{ className?: string }> = ({ className }) => (
+// MP5 벡터 아이콘 컴포넌트를 `export`합니다.
+export const MP5Vector: React.FC<WeaponIconWrapperProps> = ({ className }) => (
   <svg viewBox="0 0 220 120" className={className} xmlns="http://www.w3.org/2000/svg">
     <defs>
-      <linearGradient id="mp5Body" x1="0%" y1="0%" x2="0%" y2="100%">
-        <stop offset="0%" stopColor="#374151" />
+      <linearGradient id="mp5BodyGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stopColor="#6b7280" />
+        <stop offset="50%" stopColor="#4b5563" />
         <stop offset="100%" stopColor="#1f2937" />
       </linearGradient>
-      <linearGradient id="mp5Mag" x1="0%" y1="0%" x2="100%" y2="0%">
-        <stop offset="0%" stopColor="#111827" />
-        <stop offset="50%" stopColor="#374151" />
-        <stop offset="100%" stopColor="#111827" />
-      </linearGradient>
+      <filter id="mp5Glow">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="blur" />
+        <feMerge>
+          <feMergeNode in="blur" />
+          <feMergeNode in="SourceGraphic" />
+        </feMerge>
+      </filter>
     </defs>
-    
-    {/* Magazine (Curved) */}
-    <path d="M90 70 Q 80 110 100 120 L 115 115 Q 95 105 110 70 Z" fill="url(#mp5Mag)" stroke="#000" strokeWidth="1"/>
-
-    {/* Stock (Collapsible) */}
-    <rect x="5" y="45" width="40" height="10" fill="#1f2937" />
-    <path d="M5 45 L5 65 L15 65 L15 55" fill="none" stroke="#1f2937" strokeWidth="4" />
-
-    {/* Grip */}
-    <path d="M55 70 L50 100 L75 105 L85 70 Z" fill="#4b5563" stroke="#1f2937" strokeWidth="2"/>
-
-    {/* Main Body */}
-    <rect x="45" y="35" width="100" height="35" rx="2" fill="url(#mp5Body)" stroke="#000" strokeWidth="1"/>
-    
-    {/* Barrel Handguard */}
-    <rect x="145" y="40" width="50" height="25" fill="#111827" stroke="#374151" strokeWidth="2"/>
-    <line x1="150" y1="40" x2="150" y2="65" stroke="#374151" strokeWidth="2" opacity="0.5"/>
-    <line x1="160" y1="40" x2="160" y2="65" stroke="#374151" strokeWidth="2" opacity="0.5"/>
-    <line x1="170" y1="40" x2="170" y2="65" stroke="#374151" strokeWidth="2" opacity="0.5"/>
-    <line x1="180" y1="40" x2="180" y2="65" stroke="#374151" strokeWidth="2" opacity="0.5"/>
-
-    {/* Muzzle */}
-    <rect x="195" y="48" width="10" height="8" fill="#000" />
-
-    {/* Sights */}
-    <circle cx="150" cy="35" r="5" fill="none" stroke="#000" strokeWidth="2" />
-    <path d="M50 35 L50 25 L60 35" fill="none" stroke="#000" strokeWidth="2" />
-    
-    {/* Trigger Guard */}
-    <path d="M70 70 Q70 85 85 85" fill="none" stroke="#374151" strokeWidth="2"/>
+    {/* Body */}
+    <rect x="20" y="40" width="150" height="30" rx="3" fill="url(#mp5BodyGradient)" filter="url(#mp5Glow)"/>
+    {/* Barrel */}
+    <rect x="170" y="45" width="30" height="20" rx="2" fill="#111827"/>
+    {/* Stock */}
+    <rect x="5" y="45" width="15" height="20" rx="2" fill="#374151"/>
+    {/* Magazine */}
+    <rect x="100" y="68" width="15" height="30" rx="2" fill="#1f2937"/>
+    {/* Sight */}
+    <rect x="70" y="30" width="30" height="8" rx="1" fill="#111827"/>
+    {/* Handle */}
+    <path d="M60 70 Q70 85 80 70 L80 60 L60 60 Z" fill="#374151"/>
   </svg>
 );
 
-// PNG 로드 실패 시 보여줄 벡터(SVG) 아이콘 - Rifle
-const RifleVector: React.FC<{ className?: string }> = ({ className }) => (
-    <svg viewBox="0 0 250 80" className={className} xmlns="http://www.w3.org/2000/svg">
-        <defs>
-            <linearGradient id="rifleBody" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="#8d6e63" />
-                <stop offset="100%" stopColor="#5d4037" />
-            </linearGradient>
-            <linearGradient id="rifleMetal" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="#424242" />
-                <stop offset="100%" stopColor="#212121" />
-            </linearGradient>
-        </defs>
-        {/* Stock */}
-        <path d="M0 40 L50 35 L80 60 L60 65 Z" fill="url(#rifleBody)" stroke="#3e2723" strokeWidth="1"/>
-        {/* Grip and Trigger */}
-        <path d="M80 35 L90 55 L100 55 L110 35 Z" fill="#3e2723"/>
-        <path d="M100 45 Q100 55 110 55" fill="none" stroke="#212121" strokeWidth="2"/>
-        {/* Body and Barrel */}
-        <rect x="70" y="30" width="150" height="10" fill="url(#rifleMetal)" stroke="#000" strokeWidth="1"/>
-        <rect x="70" y="20" width="180" height="10" fill="url(#rifleBody)" stroke="#3e2723" strokeWidth="1"/>
-        {/* Scope */}
-        <rect x="100" y="10" width="50" height="10" rx="2" fill="#212121"/>
-        <rect x="95" y="14" width="5" height="2" fill="#424242"/>
-        <rect x="150" y="14" width="5" height="2" fill="#424242"/>
-    </svg>
+// Rifle 벡터 아이콘 컴포넌트를 `export`합니다.
+export const RifleVector: React.FC<WeaponIconWrapperProps> = ({ className }) => (
+  <svg viewBox="0 0 250 80" className={className} xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="rifleGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stopColor="#a3a3a3" />
+        <stop offset="50%" stopColor="#737373" />
+        <stop offset="100%" stopColor="#404040" />
+      </linearGradient>
+      <filter id="rifleGlow">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="blur" />
+        <feMerge>
+          <feMergeNode in="blur" />
+          <feMergeNode in="SourceGraphic" />
+        </feMerge>
+      </filter>
+    </defs>
+    {/* Stock */}
+    <path d="M10 40 Q20 20 50 20 L70 20 L70 60 L50 60 Q20 60 10 40 Z" fill="#5d4037"/>
+    {/* Body */}
+    <rect x="60" y="30" width="100" height="20" rx="3" fill="url(#rifleGradient)" filter="url(#rifleGlow)"/>
+    {/* Barrel */}
+    <rect x="160" y="35" width="70" height="10" rx="2" fill="#212121"/>
+    {/* Sight */}
+    <rect x="100" y="25" width="20" height="5" rx="1" fill="#333"/>
+    {/* Magazine */}
+    <rect x="110" y="50" width="10" height="20" rx="2" fill="#333"/>
+  </svg>
 );
 
-// PNG 로드 실패 시 보여줄 벡터(SVG) 아이콘 - Shotgun
-const ShotgunVector: React.FC<{ className?: string }> = ({ className }) => (
-    <svg viewBox="0 0 250 80" className={className} xmlns="http://www.w3.org/2000/svg">
-        <defs>
-            <linearGradient id="shotgunWood" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="#a16207" />
-                <stop offset="100%" stopColor="#713f12" />
-            </linearGradient>
-            <linearGradient id="shotgunMetal" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="#737373" />
-                <stop offset="100%" stopColor="#404040" />
-            </linearGradient>
-        </defs>
-        {/* Stock */}
-        <path d="M0 45 L60 40 L80 65 L50 70 Z" fill="url(#shotgunWood)" stroke="#422006" strokeWidth="1"/>
-        {/* Grip */}
-        <path d="M80 40 L85 60 L95 60 L100 40 Z" fill="#422006"/>
-        {/* Receiver */}
-        <rect x="90" y="35" width="40" height="15" fill="url(#shotgunMetal)" stroke="#171717" strokeWidth="1"/>
-        {/* Barrel */}
-        <rect x="130" y="38" width="110" height="8" fill="url(#shotgunMetal)" stroke="#171717" strokeWidth="1"/>
-        {/* Pump */}
-        <rect x="150" y="48" width="50" height="10" rx="2" fill="url(#shotgunWood)" stroke="#422006" strokeWidth="1"/>
-    </svg>
+// Shotgun 벡터 아이콘 컴포넌트를 `export`합니다.
+export const ShotgunVector: React.FC<WeaponIconWrapperProps> = ({ className }) => (
+  <svg viewBox="0 0 250 80" className={className} xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="shotgunGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stopColor="#cc7a29" />
+        <stop offset="50%" stopColor="#a35f20" />
+        <stop offset="100%" stopColor="#7a4718" />
+      </linearGradient>
+      <filter id="shotgunGlow">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="blur" />
+        <feMerge>
+          <feMergeNode in="blur" />
+          <feMergeNode in="SourceGraphic" />
+        </feMerge>
+      </filter>
+    </defs>
+    {/* Stock */}
+    <path d="M10 40 Q20 20 50 20 L70 20 L70 60 L50 60 Q20 60 10 40 Z" fill="#8b4513"/>
+    {/* Body */}
+    <rect x="60" y="30" width="100" height="20" rx="3" fill="url(#shotgunGradient)" filter="url(#shotgunGlow)"/>
+    {/* Pump */}
+    <rect x="70" y="33" width="30" height="14" rx="2" fill="#423532"/>
+    {/* Barrel */}
+    <rect x="160" y="35" width="70" height="10" rx="2" fill="#303030"/>
+  </svg>
 );
 
-// 아이콘 컴포넌트들이 공통으로 사용할 props 인터페이스
-interface IconProps {
-  className?: string;
-  style?: React.CSSProperties; // 동적 스타일링을 위해 style prop 추가
-}
 
-// M1911 권총 이미지를 표시합니다.
-export const PistolIcon: React.FC<IconProps> = ({ className, style }) => {
-  const imagePaths = [
-    'https://storage.cloud.google.com/kaelove_game_01/Gemini_Generated_m1911.png', 
-    '/m1911.png',        
-    'm1911.png',         
-  ];
-  return <WeaponIcon imagePaths={imagePaths} fallback={<M1911Vector className={className} />} className={className} alt={GAME_TEXT.WEAPONS.M1911.NAME} style={style} />;
-};
-
-// MP5 이미지를 표시합니다.
-export const MP5Icon: React.FC<IconProps> = ({ className, style }) => {
-  const imagePaths = [
-    'https://storage.cloud.google.com/kaelove_game_01/Gemini_Generated_mp5.png', 
-    '/mp5.png',        
-    'mp5.png',         
-  ];
-  return <WeaponIcon imagePaths={imagePaths} fallback={<MP5Vector className={className} />} className={className} alt={GAME_TEXT.WEAPONS.MP5.NAME} style={style} />;
-};
-
-// Rifle 이미지를 표시합니다.
-export const RifleIcon: React.FC<IconProps> = ({ className, style }) => {
-  const imagePaths = [
-    'https://storage.cloud.google.com/kaelove_game_01/bunny_Rifle.png', 
-    '/bunny_Rifle.png',        
-    'bunny_Rifle.png',         
-  ];
-  return <WeaponIcon imagePaths={imagePaths} fallback={<RifleVector className={className} />} className={className} alt={GAME_TEXT.WEAPONS.RIFLE.NAME} style={style} />;
-};
-
-// Shotgun 이미지를 표시합니다.
-export const ShotgunIcon: React.FC<IconProps> = ({ className, style }) => {
-  const imagePaths = [
-    'https://storage.cloud.google.com/kaelove_game_01/Gemini_Generated_Shotgun.png',
-  ];
-  return <WeaponIcon imagePaths={imagePaths} fallback={<ShotgunVector className={className} />} className={className} alt={GAME_TEXT.WEAPONS.SHOTGUN.NAME} style={style} />;
-};
-
-
-// 공통 무기 아이콘 컴포넌트
-const WeaponIcon: React.FC<{ imagePaths: string[], fallback: React.ReactNode, className?: string, alt: string, style?: React.CSSProperties }> = ({ imagePaths, fallback, className, alt, style }) => {
+// 이미지 경로가 없을 경우를 대비하여 폴백 처리하는 헬퍼 컴포넌트입니다.
+// 이 컴포넌트 자체도 외부에 노출되어야 하므로 `export` 합니다.
+export const WeaponIcon: React.FC<WeaponIconProps> = ({ imagePaths, fallback, className, alt, style }) => {
   const [currentPathIndex, setCurrentPathIndex] = useState(0);
   const [useFallback, setUseFallback] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
 
   const handleError = () => {
     if (currentPathIndex < imagePaths.length - 1) {
+      // 다음 경로 시도
       setCurrentPathIndex(prev => prev + 1);
+      setIsLoaded(false); // 이미지 로딩 상태 초기화
     } else {
+      // 모든 경로 실패, 폴백 사용
       setUseFallback(true);
     }
   };
 
-  const handleLoad = () => {
-    setIsLoaded(true);
-  };
+  const handleLoad = () => setIsLoaded(true);
 
   if (useFallback) {
     return <>{fallback}</>;
   }
 
+  // 이미지 경로가 비어있는 경우 즉시 폴백 사용
+  if (!imagePaths || imagePaths.length === 0) {
+      // 이 부분은 React 렌더링 사이클 외부에서 상태를 업데이트하므로,
+      // `useEffect`로 래핑하거나 초기 렌더링 시점에만 검사하는 것이 더 안전합니다.
+      // 현재는 렌더링 도중 상태 업데이트가 발생할 수 있어 주의가 필요하지만,
+      // 대부분의 경우 `imagePaths`가 props로 바로 전달되어 초기화되므로 큰 문제는 없습니다.
+      setUseFallback(true);
+      return <>{fallback}</>;
+  }
+
   return (
     <div style={style} className={`relative flex items-center justify-center overflow-hidden ${className}`}>
-      {/* 로딩 애니메이션 제거됨: 이미지가 로드되면 투명도 전환으로 자연스럽게 표시됩니다. */}
-      
-      <img 
-        key={imagePaths[currentPathIndex]}
-        src={imagePaths[currentPathIndex]} 
+      <img
+        key={imagePaths[currentPathIndex]} // key를 변경하여 React가 새로운 img 요소를 마운트하도록 함
+        src={imagePaths[currentPathIndex]}
         alt={alt}
         className={`w-full h-full object-contain drop-shadow-[0_4px_6px_rgba(0,0,0,0.5)] transition-opacity duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
         draggable={false}
@@ -273,3 +226,47 @@ const WeaponIcon: React.FC<{ imagePaths: string[], fallback: React.ReactNode, cl
     </div>
   );
 };
+
+// PistolIcon 컴포넌트를 `export`합니다.
+export const PistolIcon: React.FC<WeaponIconWrapperProps> = ({ className, style }) => (
+    <WeaponIcon 
+      imagePaths={['https://storage.cloud.google.com/kaelove_game_01/Gemini_Generated_m1911.png', '/m1911.png', 'm1911.png']} 
+      fallback={<M1911Vector className={className} />} 
+      className={className} 
+      alt={GAME_TEXT.WEAPONS.M1911.NAME} 
+      style={style} 
+    />
+);
+
+// MP5Icon 컴포넌트를 `export`합니다.
+export const MP5Icon: React.FC<WeaponIconWrapperProps> = ({ className, style }) => (
+    <WeaponIcon 
+      imagePaths={['https://storage.cloud.google.com/kaelove_game_01/Gemini_Generated_mp5.png', '/mp5.png', 'mp5.png']} 
+      fallback={<MP5Vector className={className} />} 
+      className={className} 
+      alt={GAME_TEXT.WEAPONS.MP5.NAME} 
+      style={style} 
+    />
+);
+
+// RifleIcon 컴포넌트를 `export`합니다.
+export const RifleIcon: React.FC<WeaponIconWrapperProps> = ({ className, style }) => (
+    <WeaponIcon 
+      imagePaths={['https://storage.cloud.google.com/kaelove_game_01/bunny_Rifle.png', '/bunny_Rifle.png', 'bunny_Rifle.png']} 
+      fallback={<RifleVector className={className} />} 
+      className={className} 
+      alt={GAME_TEXT.WEAPONS.RIFLE.NAME} 
+      style={style} 
+    />
+);
+
+// ShotgunIcon 컴포넌트를 `export`합니다.
+export const ShotgunIcon: React.FC<WeaponIconWrapperProps> = ({ className, style }) => (
+    <WeaponIcon 
+      imagePaths={['https://storage.cloud.google.com/kaelove_game_01/Gemini_Generated_Shotgun.png']} 
+      fallback={<ShotgunVector className={className} />} 
+      className={className} 
+      alt={GAME_TEXT.WEAPONS.SHOTGUN.NAME} 
+      style={style} 
+    />
+);

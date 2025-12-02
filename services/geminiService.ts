@@ -1,4 +1,4 @@
-import { GAME_TEXT } from '../textConfig';
+import { GAME_TEXT } from './config/textConfig';
 
 // Helper function to get a random element from a string array.
 const getRandomText = (array: string[]): string => {

@@ -1,13 +1,13 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import { Player, Zombie, Bullet, Particle, Shell, FloatingText, GameStatus, WeaponPart, UpgradeState, Item, ItemType } from '../types';
-import { GAME_SETTINGS, SOUND_SETTINGS, FLOATING_TEXT, RENDER_SETTINGS } from '../gameConfig';
-import { ZOMBIE_STATS } from '../zombieConfig';
-import { PLAYER_STATS } from '../playerConfig';
-import { WEAPONS } from '../weaponConfig';
+import { GAME_SETTINGS, SOUND_SETTINGS, FLOATING_TEXT, RENDER_SETTINGS } from '../config/gameConfig';
+import { ZOMBIE_STATS } from '../config/zombieConfig';
+import { PLAYER_STATS } from '../config/playerConfig';
+import { WEAPONS } from '../config/weaponConfig';
 import { soundService } from '../services/SoundService';
-import { GAME_TEXT } from '../textConfig';
-import { UPGRADE_CONFIG } from '../upgradeConfig'; // 업그레이드 중앙 설정 파일 임포트
-import { ITEMS_CONFIG } from '../itemConfig'; // 아이템 설정 파일 임포트
+import { GAME_TEXT } from '../config/textConfig';
+import { UPGRADE_CONFIG } from '../config/upgradeConfig'; // 업그레이드 중앙 설정 파일 임포트
+import { ITEMS_CONFIG } from '../config/itemConfig'; // 아이템 설정 파일 임포트
 
 interface GameCanvasProps {
   gameStatus: GameStatus;
@@ -68,7 +68,15 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
     rotationAcceleration: PLAYER_STATS.rotationAcceleration, 
 
     activeTargetAngle: 0, 
-    aimQueue: [] 
+    aimQueue: [{ time: 0, angle: 0 }], // 초기화 시 빈 배열 대신 초기값 포함
+
+    // [NEW] 빠른 재장전 시스템 초기화
+    quickReloadSweetSpot: 0,
+    quickReloadHitWindowStart: 0,
+    quickReloadHitWindowEnd: 0,
+    quickReloadShakeTimer: 0,
+    isQuickReloadAttempted: false,
+    quickReloadCooldownTimer: 0, // 빠른 재장전 성공 후 발사 방지 쿨다운 타이머
   });
 
   const zombiesRef = useRef<Zombie[]>([]);
@@ -271,8 +279,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
   };
 
   const initGame = useCallback(() => {
-    // [삭제] soundService.init() 호출을 App.tsx로 이동. GameCanvas에서는 호출하지 않습니다.
-    // soundService.init();
+    // [제거] soundService.init(); // App.tsx에서 중앙에서 관리하도록 변경
 
     if (!backgroundCanvasRef.current) {
         generateGroundTexture();
@@ -312,7 +319,15 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
       maxRotationSpeed: PLAYER_STATS.maxRotationSpeed,
       rotationAcceleration: PLAYER_STATS.rotationAcceleration,
       activeTargetAngle: 0,
-      aimQueue: []
+      aimQueue: [], // 초기화 시 빈 배열로 시작
+
+      // [NEW] 빠른 재장전 시스템 초기화
+      quickReloadSweetSpot: 0,
+      quickReloadHitWindowStart: 0,
+      quickReloadHitWindowEnd: 0,
+      quickReloadShakeTimer: 0,
+      isQuickReloadAttempted: false,
+      quickReloadCooldownTimer: 0, // 빠른 재장전 성공 후 발사 방지 쿨다운 타이머 초기화
     };
     zombiesRef.current = [];
     bulletsRef.current = [];
@@ -355,11 +370,14 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
       // 치트키: G (Instant Level Up)
       if (e.code === 'KeyG' && (gameStatus === GameStatus.PLAYING || gameStatus === GameStatus.LEVEL_UP)) {
           if (playerRef.current) {
-              playerRef.current.xp = playerRef.current.maxXp;
-              createFloatingText(playerRef.current.x, playerRef.current.y - 50, "CHEAT: LEVEL UP", false, '#22c55e');
+              // FIX: 'player' 변수가 선언되기 전에 사용되는 오류 수정
+              // `playerRef.current`를 먼저 `player` 상수에 할당하여 참조 오류를 방지합니다.
+              const player = playerRef.current; 
+
+              player.xp = player.maxXp;
+              createFloatingText(player.x, player.y - 50, "CHEAT: LEVEL UP", false, '#22c55e');
               
               // 즉시 레벨업 처리 로직 추가
-              const player = playerRef.current;
               if (player.xp >= player.maxXp) {
                   player.level++;
                   player.xp -= player.maxXp;
@@ -385,8 +403,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
       }
     };
     const handleMouseDown = () => {
-       // [삭제] soundService.init() 호출을 App.tsx로 이동. GameCanvas에서는 호출하지 않습니다.
-       // soundService.init();
+       // [제거] soundService.init(); // App.tsx에서 중앙에서 관리하도록 변경
        mouseDownRef.current = true;
     };
     const handleMouseUp = () => {
@@ -409,14 +426,31 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
   }, [gameStatus, setGameStatus]); 
 
   const reload = () => {
-    if (playerRef.current.isReloading || playerRef.current.ammo === playerRef.current.maxAmmo) return;
+    const player = playerRef.current;
+    if (player.isReloading || player.ammo === player.maxAmmo) return;
     
-    playerRef.current.isReloading = true;
+    player.isReloading = true;
     soundService.play('reload');
     
-    const actualReloadTimeMs = currentWeapon.reloadTime / playerRef.current.reloadAbility;
-    playerRef.current.totalReloadTime = actualReloadTimeMs / 1000;
-    playerRef.current.reloadTimer = 0;
+    const actualReloadTimeMs = currentWeapon.reloadTime / player.reloadAbility;
+    player.totalReloadTime = actualReloadTimeMs / 1000; // 초 단위
+    player.reloadTimer = 0;
+    player.isQuickReloadAttempted = false; // 새로운 재장전 시작 시 초기화
+    player.quickReloadShakeTimer = 0; // 흔들림 타이머 초기화
+    player.quickReloadCooldownTimer = 0; // 빠른 재장전 쿨다운 타이머 초기화
+
+    // [NEW] 빠른 재장전 타이밍 및 성공 범위 계산
+    const minTime = currentWeapon.quickReloadMinTimePercent;
+    const maxTime = currentWeapon.quickReloadMaxTimePercent;
+    const difficulty = currentWeapon.quickReloadDifficultyPercent;
+
+    // 랜덤하게 스윗스팟 결정 (최소 ~ 최대 범위 내)
+    player.quickReloadSweetSpot = minTime + Math.random() * (maxTime - minTime);
+    
+    // 성공 범위 계산 (스윗스팟 중앙으로)
+    player.quickReloadHitWindowStart = Math.max(0, player.quickReloadSweetSpot - difficulty / 2);
+    player.quickReloadHitWindowEnd = Math.min(1, player.quickReloadSweetSpot + difficulty / 2);
+
     // [FIX] 재장전 시 반동을 즉시 초기화하는 대신,
     // update()의 자연스러운 회복 로직에 맡겨 조준원이 부드럽게 줄어들도록 합니다.
     // playerRef.current.consecutiveShots = 0;
@@ -449,15 +483,48 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
 
   const shoot = () => {
     if (gameStatus !== GameStatus.PLAYING) return;
-    if (playerRef.current.isReloading) return;
     
-    if (playerRef.current.ammo <= 0) {
+    const player = playerRef.current;
+    const effectiveStats = calculateWeaponStats(player.level);
+    const now = Date.now();
+
+    // [NEW] 빠른 재장전 성공 후 쿨다운 중에는 발사되지 않도록 합니다.
+    if (player.quickReloadCooldownTimer > 0) return;
+
+    // [NEW] 빠른 재장전 입력 감지 로직
+    if (player.isReloading) {
+        // 최소 진행도 이전에는 빠른 재장전 시도를 체크하지 않음
+        const reloadProgress = player.reloadTimer / player.totalReloadTime;
+        if (reloadProgress < GAME_SETTINGS.quickReloadInputMinProgress) return; 
+
+        // 한 번의 재장전 주기 동안 빠른 재장전 시도는 한 번만
+        if (player.isQuickReloadAttempted) return; 
+        
+        player.isQuickReloadAttempted = true; // 시도 플래그 설정
+
+        // 현재 재장전 진행도가 성공 범위 내에 있는지 확인
+        if (reloadProgress >= player.quickReloadHitWindowStart && reloadProgress <= player.quickReloadHitWindowEnd) {
+            // 빠른 재장전 성공!
+            player.ammo = player.maxAmmo; // 즉시 탄약 채움
+            player.isReloading = false; // 재장전 상태 종료
+            soundService.play('quickReloadSuccess');
+            createFloatingText(player.x, player.y - 60, GAME_TEXT.HUD.QUICK_RELOAD_SUCCESS, false, '#22c55e'); // 초록색 텍스트
+            player.quickReloadShakeTimer = 0; // 혹시 모를 흔들림 초기화
+            player.quickReloadCooldownTimer = GAME_SETTINGS.quickReloadPostSuccessCooldown; // 성공 시 쿨다운 시작
+        } else {
+            // 빠른 재장전 실패!
+            soundService.play('quickReloadFail');
+            player.quickReloadShakeTimer = GAME_SETTINGS.quickReloadShakeDuration; // 흔들림 타이머 시작
+            createFloatingText(player.x, player.y - 60, GAME_TEXT.HUD.QUICK_RELOAD_FAIL, false, '#ef4444'); // 빨간색 텍스트
+            // 실패해도 일반 재장전은 계속 진행됩니다.
+        }
+        return; // 빠른 재장전 시도는 발사 시도를 대체하므로 여기서 리턴
+    }
+    
+    if (player.ammo <= 0) {
       reload();
       return;
     }
-
-    const now = Date.now();
-    const effectiveStats = calculateWeaponStats(playerRef.current.level);
 
     if (now - lastShotTimeRef.current < effectiveStats.fireRate) return;
 
@@ -473,8 +540,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
     }
 
     // 발사된 총알 번호 (현재 탄약 수) - 예를 들어 8발 남았을 때 쏘면 8번 총알이 발사됨
-    const firedAmmoIndex = playerRef.current.ammo;
-    playerRef.current.ammo--;
+    const firedAmmoIndex = player.ammo;
+    player.ammo--;
     
     // 즉시 App 컴포넌트에 이벤트 전달 (탄피 연출용)
     // Ref를 사용하여 항상 최신 핸들러를 호출 (Stale Closure 방지)
@@ -486,25 +553,25 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
     // 1. 기존의 값을 덮어쓰는 대신, 현재 반동에 `gunRecoil` 값을 더하여 누적시킵니다.
     // 2. `Math.min`을 사용하여 누적된 반동이 `gameConfig.ts`에 설정된 최대치(`maxVisualRecoil`)를
     //    넘지 않도록 제한합니다. 이로써 라이플 등이 화면 밖으로 밀려나는 버그가 해결됩니다.
-    playerRef.current.recoilOffset = Math.min(
-      playerRef.current.recoilOffset + currentWeapon.gunRecoil,
+    player.recoilOffset = Math.min(
+      player.recoilOffset + currentWeapon.gunRecoil,
       RENDER_SETTINGS.maxVisualRecoil
     );
     
     lastShotTimeRef.current = now;
 
-    const angle = playerRef.current.rotation;
+    const angle = player.rotation;
     const gunLength = effectiveStats.gunLength;
     const gunOffset = currentWeapon.gunRightOffset;
     
-    const muzzleX = playerRef.current.x + (gunLength * Math.cos(angle) - gunOffset * Math.sin(angle));
-    const muzzleY = playerRef.current.y + (gunLength * Math.sin(angle) + gunOffset * Math.cos(angle));
+    const muzzleX = player.x + (gunLength * Math.cos(angle) - gunOffset * Math.sin(angle));
+    const muzzleY = player.y + (gunLength * Math.sin(angle) + gunOffset * Math.cos(angle));
 
     // [BUG FIX] 연속 사격 횟수가 무기의 '반동 제어력' 수치를 초과하여 무한정 누적되는 버그를 수정합니다.
     // 이제 연속 사격 횟수는 현재 무기의 반동 제어력(recoilControl) 값을 상한선으로 가집니다.
     // 이로 인해, 아무리 연사를 하더라도 재장전 시 항상 정상적으로 반동이 회복됩니다.
-    playerRef.current.consecutiveShots = Math.min(
-      playerRef.current.consecutiveShots + 1,
+    player.consecutiveShots = Math.min(
+      player.consecutiveShots + 1,
       effectiveStats.recoilControl
     );
     
@@ -512,7 +579,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
 
     for (let i = 0; i < pelletCount; i++) {
         // [산탄 시스템] 각 펠릿(총알)마다 개별적으로 탄퍼짐을 계산합니다.
-        const spread = (Math.random() - 0.5) * playerRef.current.currentSpread;
+        const spread = (Math.random() - 0.5) * player.currentSpread;
         const isCritical = Math.random() < currentWeapon.criticalChance;
 
         bulletsRef.current.push({
@@ -596,8 +663,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
 
     const shellConfig = currentWeapon.shellEjection;
     const breechOffset = gunLength - 10;
-    const breechX = playerRef.current.x + (breechOffset * Math.cos(angle) - gunOffset * Math.sin(angle));
-    const breechY = playerRef.current.y + (breechOffset * Math.sin(angle) + gunOffset * Math.cos(angle));
+    const breechX = player.x + (breechOffset * Math.cos(angle) - gunOffset * Math.sin(angle));
+    const breechY = player.y + (breechOffset * Math.sin(angle) + gunOffset * Math.cos(angle));
 
     const ejectAngle = angle + Math.PI / 2 + (Math.random() - 0.5) * shellConfig.variance;
     const ejectSpeed = shellConfig.velocity + (Math.random() - 0.5) * 20;
@@ -746,7 +813,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
               growth: -2
           });
       }
-  };
+    }
 
   const getLineCircleIntersection = (p1: {x:number, y:number}, p2: {x:number, y:number}, circle: { x: number, y: number, radius: number }): number | null => {
     const d = { x: p2.x - p1.x, y: p2.y - p1.y };
@@ -789,6 +856,23 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
         shoot();
     }
     
+    // [NEW] 빠른 재장전 실패 시 흔들림 타이머 업데이트
+    if (player.quickReloadShakeTimer > 0) {
+        player.quickReloadShakeTimer -= deltaTime;
+        if (player.quickReloadShakeTimer < 0) {
+            player.quickReloadShakeTimer = 0;
+        }
+    }
+
+    // [NEW] 빠른 재장전 쿨다운 타이머 업데이트
+    if (player.quickReloadCooldownTimer > 0) {
+        player.quickReloadCooldownTimer -= deltaTime;
+        if (player.quickReloadCooldownTimer < 0) {
+            player.quickReloadCooldownTimer = 0;
+        }
+    }
+
+
     // --- 반동 및 명중률 시스템 업데이트 ---
 
     // 1. 사격으로 인한 반동 회복 (부드럽게)
@@ -1460,8 +1544,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
         const tailX = b.x + dirX * currentTrailLength;
         const tailY = b.y + dirY * currentTrailLength;
 
-        ctx.strokeStyle = 'rgba(251, 191, 36, 0.3)';
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; // 변경된 색상
+        ctx.lineWidth = 2; // 선 두께
         ctx.beginPath();
         ctx.moveTo(b.x, b.y);
         ctx.lineTo(tailX, tailY);
@@ -1626,22 +1710,64 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
     ctx.restore();
 
     if (p.isReloading) {
-        const barWidth = 40;
-        const barHeight = 6;
-        const yOffset = -35;
+        // [NEW] 설정 파일에서 스케일 값들을 가져와 적용합니다.
+        const scale = RENDER_SETTINGS.reloadUIScale;
+        const barWidth = RENDER_SETTINGS.reloadUIBaseWidth * scale;
+        const barHeight = RENDER_SETTINGS.reloadUIBaseHeight * scale;
+        const yOffset = RENDER_SETTINGS.reloadUIBaseYOffset * scale;
+        const arrowBaseSize = RENDER_SETTINGS.quickReloadArrowBaseSize * scale;
+        const textFontSize = RENDER_SETTINGS.quickReloadTextBaseSize * scale;
+
+        const reloadProgress = Math.min(p.reloadTimer / p.totalReloadTime, 1.0);
+
+        // [NEW] 빠른 재장전 실패 시 흔들림 효과
+        let shakeOffsetX = 0;
+        let shakeOffsetY = 0;
+        if (p.quickReloadShakeTimer > 0) {
+            // 흔들림 강도 및 빈도 조절
+            const shakeIntensity = 2 * scale; // 스케일에 따라 흔들림 강도도 조절
+            shakeOffsetX = (Math.random() - 0.5) * shakeIntensity;
+            shakeOffsetY = (Math.random() - 0.5) * shakeIntensity;
+        }
+
+        // 재장전 바 배경
         ctx.fillStyle = '#1f2937'; 
-        ctx.fillRect(p.x - barWidth / 2, p.y + yOffset, barWidth, barHeight);
-        const progress = Math.min(p.reloadTimer / p.totalReloadTime, 1.0);
+        ctx.fillRect(p.x - barWidth / 2 + shakeOffsetX, p.y + yOffset + shakeOffsetY, barWidth, barHeight);
+        
+        // [MODIFIED] 빠른 재장전 성공 범위 (초록색)는 재장전 중이면 항상 표시합니다.
+        const hitWindowStartPx = (p.x - barWidth / 2) + (barWidth * p.quickReloadHitWindowStart);
+        const hitWindowEndPx = (p.x - barWidth / 2) + (barWidth * p.quickReloadHitWindowEnd);
+        const hitWindowWidthPx = hitWindowEndPx - hitWindowStartPx;
+
+        ctx.fillStyle = '#22c55e'; // Tailwind green-500
+        ctx.fillRect(hitWindowStartPx + shakeOffsetX, p.y + yOffset + shakeOffsetY, hitWindowWidthPx, barHeight);
+        
+
+        // 재장전 진행 바 (노란색)
         ctx.fillStyle = '#eab308'; 
-        ctx.fillRect(p.x - barWidth / 2 + 1, p.y + yOffset + 1, (barWidth - 2) * progress, barHeight - 2);
-        ctx.font = 'bold 12px "Do Hyeon", sans-serif';
+        ctx.fillRect(p.x - barWidth / 2 + (1 * scale) + shakeOffsetX, p.y + yOffset + (1 * scale) + shakeOffsetY, (barWidth - (2 * scale)) * reloadProgress, barHeight - (2 * scale));
+
+        // [MODIFIED] 빠른 재장전 스윗스팟 화살표 (빨간색)는 재장전 중이면 항상 표시합니다.
+        const arrowX = (p.x - barWidth / 2) + (barWidth * p.quickReloadSweetSpot) + shakeOffsetX;
+        const arrowY = p.y + yOffset + barHeight + (2 * scale) + shakeOffsetY; // 바 아래, 스케일된 여백 적용
+
+        ctx.fillStyle = '#ef4444'; // Tailwind red-500
+        ctx.beginPath();
+        ctx.moveTo(arrowX, arrowY);
+        ctx.lineTo(arrowX - arrowBaseSize, arrowY + (arrowBaseSize * 1.5)); // 화살표 크기 스케일 적용
+        ctx.lineTo(arrowX + arrowBaseSize, arrowY + (arrowBaseSize * 1.5));
+        ctx.closePath();
+        ctx.fill();
+
+        // 재장전 텍스트
+        ctx.font = `bold ${textFontSize}px "Do Hyeon", sans-serif`; // 폰트 크기 스케일 적용
         ctx.fillStyle = '#ffffff';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 3 * scale; // 폰트 테두리 두께 스케일 적용
         ctx.strokeStyle = 'black';
-        ctx.strokeText(GAME_TEXT.HUD.RELOADING, p.x, p.y + yOffset - 4);
-        ctx.fillText(GAME_TEXT.HUD.RELOADING, p.x, p.y + yOffset - 4);
+        ctx.strokeText(GAME_TEXT.HUD.RELOADING, p.x + shakeOffsetX, p.y + yOffset - (4 * scale) + shakeOffsetY);
+        ctx.fillText(GAME_TEXT.HUD.RELOADING, p.x + shakeOffsetX, p.y + yOffset - (4 * scale) + shakeOffsetY);
     }
     
     ctx.restore(); // Camera
@@ -1682,7 +1808,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
     const canvas = canvasRef.current;
     if (canvas) {
         const ctx = canvas.getContext('2d');
-        if (ctx) { // [확인] Canvas 2D Context 획득 여부 방어 로직이 이미 존재합니다.
+        if (ctx) {
             draw(ctx);
             
             // 개발자 모드로 일시정지되었을 때 오버레이 표시
@@ -1703,13 +1829,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
                 ctx.fillText('일시 정지 (개발자 모드)', canvas.width / 2, canvas.height / 2);
                 ctx.restore();
             }
-        } else {
-            // Context가 null인 경우 경고 메시지 출력 (실제 화면에는 아무것도 그려지지 않을 것)
-            console.error("Canvas 2D context is null. Cannot draw.");
         }
     }
     requestRef.current = requestAnimationFrame(animate);
-  }, [gameStatus, isPaused, calculateWeaponStats]);
+  }, [gameStatus, isPaused, calculateWeaponStats, update, draw]); // 종속성 추가: update, draw
 
   useEffect(() => {
     requestRef.current = requestAnimationFrame(animate);
@@ -1727,10 +1850,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
     };
     window.addEventListener('resize', handleResize);
     handleResize();
-    // [수정] App.tsx에서 모든 초기화 로직을 담당하므로,
-    // GameCanvas에서는 게임 시작 시 initGame()만 호출하도록 변경합니다.
-    // 즉, gameStatus === GameStatus.MENU 조건에서 initGame()을 호출합니다.
-    if (gameStatus === GameStatus.MENU) {
+    if (gameStatus === GameStatus.MENU && waveRef.current === 1) {
         initGame();
     }
     return () => window.removeEventListener('resize', handleResize);

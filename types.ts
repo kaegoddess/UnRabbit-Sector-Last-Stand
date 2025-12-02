@@ -72,6 +72,14 @@ export interface Player extends Entity {
 
   activeTargetAngle: number; 
   aimQueue: { time: number; angle: number }[]; 
+
+  // [NEW] 빠른 재장전 시스템 관련 상태
+  quickReloadSweetSpot: number; // 재장전 게이지 0.0 ~ 1.0 사이의 빠른 재장전 성공 '지점' (화살표 위치)
+  quickReloadHitWindowStart: number; // 초록색 성공 범위 시작 (0.0 ~ 1.0)
+  quickReloadHitWindowEnd: number; // 초록색 성공 범위 끝 (0.0 ~ 1.0)
+  quickReloadShakeTimer: number; // 빠른 재장전 실패 시 흔들림 효과 타이머
+  isQuickReloadAttempted: boolean; // 현재 재장전 주기 동안 빠른 재장전을 시도했는지 여부 (한 번만 적용)
+  quickReloadCooldownTimer: number; // 빠른 재장전 성공 후 발사 방지 쿨다운 타이머
 }
 
 export interface Zombie extends Entity {

@@ -1,6 +1,8 @@
 // 게임 밸런스 및 설정을 위한 데이터베이스 (시스템, 사운드 등)
 // 좀비 설정은 zombieConfig.ts, 무기 설정은 weaponConfig.ts, 플레이어 설정은 playerConfig.ts 참조
 
+import { WeaponPart } from '../types'; // types.ts가 루트에 있으므로 상대 경로 변경됨
+
 // 거리 단위: 픽셀(px)
 // 시간 단위: 밀리초(ms) 또는 초(s)
 
@@ -19,7 +21,10 @@ export const SOUND_SETTINGS = {
     reload: 'sound/reload.mp3', 
     playerHit: 'sound/player_hit.mp3',
     itemPickup: 'sound/pickup.mp3', // 아이템 획득 사운드 파일 경로
-    uiSelect: 'sound/reload.mp3', // UI 선택 효과음. 파일이 없으므로 합성음이 재생됩니다.
+    uiSelect: 'sound/ui_select.mp3', // UI 선택 효과음. 파일이 없으므로 합성음이 재생됩니다.
+    // [NEW] 빠른 재장전 사운드
+    quickReloadSuccess: 'sound/quick_reload_success.mp3', 
+    quickReloadFail: 'sound/quick_reload_fail.mp3',
   }
 };
 
@@ -41,6 +46,11 @@ export const GAME_SETTINGS = {
   particleSpeed: 150, // 파티클 확산 속도 (px/s)
   particleLifeDecay: 2.0, // 초당 투명도 감소량 (2.0이면 0.5초 지속)
   scoreToNextWave: 10, 
+
+  // [NEW] 빠른 재장전 시스템 설정
+  quickReloadInputMinProgress: 0.3, // 재장전 진행도 30% 전까지는 빠른 재장전 입력 무시
+  quickReloadShakeDuration: 0.3, // 빠른 재장전 실패 시 재장전 바 흔들림 지속 시간 (초)
+  quickReloadPostSuccessCooldown: 0.25, // 빠른 재장전 성공 후 총알 발사 방지 쿨다운 (초)
 };
 
 // 렌더링 관련 시각 효과 설정
@@ -66,4 +76,12 @@ export const RENDER_SETTINGS = {
   // 아무리 연사해도 총몸이 이 값 이상으로 밀려나지 않습니다.
   // 라이플 등이 화면 밖으로 밀려나는 버그를 방지합니다.
   maxVisualRecoil: 40,
+
+  // [NEW] 재장전 UI 스케일 설정
+  reloadUIScale: 1.5, // 재장전 UI 전체 크기 배율 (1.0 = 100%)
+  reloadUIBaseWidth: 40, // 재장전 바의 기본 너비 (px)
+  reloadUIBaseHeight: 6, // 재장전 바의 기본 높이 (px)
+  reloadUIBaseYOffset: -35, // 플레이어 중심으로부터 Y축 오프셋 (px)
+  quickReloadArrowBaseSize: 3, // 빠른 재장전 화살표의 기본 한쪽 길이 (px)
+  quickReloadTextBaseSize: 12, // 재장전 텍스트의 기본 폰트 크기 (px)
 };

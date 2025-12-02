@@ -1,12 +1,14 @@
+
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import GameCanvas from './components/GameCanvas';
 import { GameStatus, WeaponPart, UpgradeState } from './types';
-import { PLAYER_STATS, PLAYER_HUD_SETTINGS, GAME_OVER_UI_SETTINGS } from './playerConfig';
-import { WEAPONS } from './weaponConfig';
+import { PLAYER_STATS, PLAYER_HUD_SETTINGS, GAME_OVER_UI_SETTINGS } from './config/playerConfig';
+import { WEAPONS } from './config/weaponConfig';
 import { PistolIcon, MP5Icon, RifleIcon, ShotgunIcon, TacticalLoader, WeaponLoader } from './components/GameIcons';
 import { soundService } from './services/SoundService';
-import { GAME_TEXT } from './textConfig';
-import { UPGRADE_CONFIG } from './upgradeConfig'; // 업그레이드 중앙 설정 파일 임포트
+import { GAME_TEXT } from './config/textConfig';
+import { UPGRADE_CONFIG } from './config/upgradeConfig'; // 업그레이드 중앙 설정 파일 임포트
 
 interface UICasing {
   id: string;
@@ -90,8 +92,6 @@ const App: React.FC = () => {
   const [finalReport, setFinalReport] = useState<{score: number, kills: number, wave: number} | null>(null);
   
   // 메뉴 화면 이미지 로딩 상태 (무기별로 분리)
-  // [수정] 이 상태들은 더 이상 전체 로딩 진행률에 사용되지 않고,
-  // 개별 UI 요소의 `onLoad` 핸들러에서만 사용됩니다.
   const [charLoaded, setCharLoaded] = useState(false);
   const [weaponLoaded, setWeaponLoaded] = useState(false);
   const [charMp5Loaded, setCharMp5Loaded] = useState(false);
@@ -192,19 +192,18 @@ const App: React.FC = () => {
       }
   };
 
-  // [수정] 모든 에셋 로딩을 중앙 집중화하는 새로운 useEffect
   useEffect(() => {
-    const loadAllAssets = async () => {
-      setLoadingProgress(0); // 로딩 시작 시 진행률 초기화
-      const imageAssets = Object.values(ASSETS);
+    const preloadAssets = async () => {
+      const baseAssetUrls = Object.values(ASSETS);
+      // UPGRADE_CONFIG에서 아이콘 URL을 가져오도록 수정
       const upgradeIconUrls = Object.values(UPGRADE_CONFIG).map(part => part.ICON);
-      const allImageUrls = [...new Set([...imageAssets, ...upgradeIconUrls])];
+      const imageUrls = [...new Set([...baseAssetUrls, ...upgradeIconUrls])]; // 중복 제거
 
-      const totalAssets = allImageUrls.length + Object.keys(WEAPONS).length + Object.keys(WEAPON_ASSETS).length; // 이미지 + 사운드 파일 (대략적인 계산)
+      const totalAssets = imageUrls.length + Object.keys(soundService.SOUND_ASSETS_CONFIG).length; // 사운드 에셋 개수 포함
       let loadedCount = 0;
-
-      // 1. 이미지 프리로드
-      const imagePromises = allImageUrls.map(url => {
+      
+      // 이미지 로딩 프로미스 배열 생성
+      const imagePromises = imageUrls.map(url => {
         return new Promise<void>((resolve) => {
           const img = new Image();
           img.src = url;
@@ -214,40 +213,45 @@ const App: React.FC = () => {
             resolve();
           };
           img.onerror = () => {
-            console.warn(`Failed to preload image: ${url}. Proceeding without it.`);
-            loadedCount++; // 실패했어도 카운트는 증가시켜 진행률은 업데이트
+            console.warn(`Failed to preload image: ${url}`);
+            loadedCount++; 
             setLoadingProgress(Math.round((loadedCount / totalAssets) * 100));
             resolve();
           };
         });
       });
+      
+      // 이미지 로딩 대기
       await Promise.all(imagePromises);
 
-      // 2. SoundService 초기화 및 사운드 에셋 로딩
+      // 사운드 서비스 초기화 및 로드 대기 (비동기 처리)
       try {
-        await soundService.init(); // SoundService의 init()이 내부적으로 loadAssets()를 await합니다.
-        loadedCount += Object.keys(WEAPONS).length; // 사운드 에셋 로딩에 대한 대략적인 카운트
+        await soundService.init(); // init은 이제 async 함수
+        loadedCount += Object.keys(soundService.SOUND_ASSETS_CONFIG).length; // 로드된 사운드 수만큼 카운트 증가
         setLoadingProgress(Math.round((loadedCount / totalAssets) * 100));
       } catch (error) {
-        console.error("SoundService initialization failed:", error);
-        // 사운드 로딩 실패 시에도 앱이 크래시되지 않고 진행되도록 합니다.
+        console.error("사운드 서비스 초기화 실패:", error);
+        // 에러가 발생해도 로딩 진행률은 업데이트하여 멈추지 않도록 함
+        loadedCount += Object.keys(soundService.SOUND_ASSETS_CONFIG).length; 
+        setLoadingProgress(Math.round((loadedCount / totalAssets) * 100));
       }
 
-      // 3. 커스텀 사운드 로딩 (IndexedDB에서)
-      try {
-        await soundService.loadCustomSoundsFromStorage();
-        loadedCount += Object.keys(WEAPON_ASSETS).length; // 커스텀 사운드 로딩에 대한 대략적인 카운트
-        setLoadingProgress(Math.round((loadedCount / totalAssets) * 100));
-      } catch (error) {
-        console.error("Failed to load custom sounds from storage:", error);
-      }
-      
-      // 모든 로딩 완료 후 상태 업데이트
+      // 최종적으로 모든 에셋 로딩 완료 후 상태 변경
       setIsLoadingAssets(false);
-      setWaitingForInput(false); // [수정] 모든 로딩이 완료되면 즉시 waitingForInput을 false로 설정
-      setMissionText(getRandomText(GAME_TEXT.MISSION_BRIEFINGS)); // 미션 텍스트도 이때 설정
+    };
+    preloadAssets();
+  }, []);
+
+  // 이 useEffect는 메뉴 화면에 처음 진입할 때만 실행됩니다.
+  // (미션 텍스트 생성, 사운드 로드, 업그레이드 초기화)
+  useEffect(() => {
+    if (gameStatus === GameStatus.MENU) {
+      // [수정] "신호 해독 중..." 애니메이션을 위한 인위적인 지연 시간 제거
+      setMissionText(getRandomText(GAME_TEXT.MISSION_BRIEFINGS));
       
-      // 업그레이드 초기화 (로딩 완료 시 한 번만)
+      // [제거] soundService.loadCustomSoundsFromStorage(); // preloadAssets에서 처리됨
+      
+      // 업그레이드 초기화
       setUpgradeLevels({
         [WeaponPart.SCOPE]: 0,
         [WeaponPart.BARREL]: 0,
@@ -258,12 +262,9 @@ const App: React.FC = () => {
         [WeaponPart.GRIP]: 0,
         [WeaponPart.STOCK]: 0,
       });
-    };
+    }
+  }, [gameStatus]);
 
-    loadAllAssets();
-  }, []); // 컴포넌트가 처음 마운트될 때 한 번만 실행
-
-  // [삭제] 이전에 gameStatus === GameStatus.MENU일 때 사운드를 로드하던 useEffect는 위로 통합됨
   // 이 useEffect는 레벨업 화면이 뜰 때 실행됩니다.
   // (개발자 모드용 좌표 초기화 등)
   useEffect(() => {
@@ -361,16 +362,14 @@ const App: React.FC = () => {
   }, [gameStatus]);
 
   const handleInitClick = () => {
-    // [수정] 이제 모든 에셋 로딩은 useEffect에서 처리되므로,
-    // 이 함수는 단순히 `waitingForInput` 상태를 `false`로만 변경합니다.
     if (!isLoadingAssets) {
+      // soundService.init(); // preloadAssets에서 이미 호출됨
       setWaitingForInput(false);
     }
   };
 
   const handleStartGame = () => {
-    // [수정] 사운드 서비스는 이미 초기화되었으므로,
-    // `setGameStatus`만 호출합니다.
+    // soundService.init(); // preloadAssets에서 이미 호출됨
     setGameStatus(GameStatus.PLAYING);
   };
 
@@ -498,7 +497,7 @@ const App: React.FC = () => {
 
   const handleCopyUpgradeCoords = () => {
     const weaponKey = selectedWeaponKey.toUpperCase();
-    let output = `// Paste this into weaponConfig.ts\n\n`;
+    let output = `// Paste this into weaponDb.ts\n\n`; // weaponDb.ts로 변경
     
     // Character Position
     output += `// Character Position for ${weaponKey}\n`;
@@ -520,11 +519,13 @@ const App: React.FC = () => {
         output += `  [WeaponPart.${part}]: { x: ${xStr}, y: ${yStr}, anchor: { x: ${anchorX}, y: ${anchorY} } },\n`;
     }
     output += `};\n\n`;
-    output += `// Then, update the WEAPONS object:\n`;
+    output += `// Then, update the WEAPON_DATABASE object:\n`;
     output += `'${selectedWeaponKey}': {\n`;
     output += `  // ... other properties\n`;
-    output += `  characterPosition: ${weaponKey}_CHAR_POS,\n`;
-    output += `  upgradePositions: ${weaponKey}_UPGRADE_POS\n`;
+    output += `  ui: {\n`; // ui 객체 안에 upgradePositions와 characterPosition이 있습니다.
+    output += `    characterPosition: ${weaponKey}_CHAR_POS,\n`;
+    output += `    upgradePositions: ${weaponKey}_UPGRADE_POS\n`;
+    output += `  }\n`;
     output += `}`;
 
     navigator.clipboard.writeText(output).then(() => {
@@ -547,7 +548,7 @@ const App: React.FC = () => {
   };
 
   const handleCopyHudConfig = () => {
-    const output = `// Paste this into playerConfig.ts
+    const output = `// Paste this into config/playerConfig.ts
 
 export const PLAYER_HUD_SETTINGS = {
   right: '${hudDevSettings.right}rem',
@@ -575,7 +576,7 @@ export const PLAYER_HUD_SETTINGS = {
   };
 
   const handleCopyGameOverConfig = () => {
-    const output = `// Paste this into playerConfig.ts
+    const output = `// Paste this into config/playerConfig.ts
 
 export const GAME_OVER_UI_SETTINGS = {
   imageWidth: '${gameOverDevSettings.width}rem',
@@ -678,7 +679,7 @@ export const GAME_OVER_UI_SETTINGS = {
             </div>
             {!isLoadingAssets && (
                 <div className="w-full text-center animate-pulse mb-8">
-                    <span className="text-green-500 font-black text-2xl tracking-[0.2em] bg-black/50 px-4 py-2 border border-green-500/50 rounded shadow-[0_0_20px_rgba(34,197,94,0.4)]">{GAME_TEXT.LOADING.SYSTEM_READY}</span>
+                    <span className="text-green-500 font-black text-2xl tracking-widest bg-black/50 px-4 py-2 border border-green-500/50 rounded shadow-[0_0_20px_rgba(34,197,94,0.4)]">{GAME_TEXT.LOADING.SYSTEM_READY}</span>
                 </div>
             )}
             <div className="space-y-2">
@@ -1139,8 +1140,6 @@ export const GAME_OVER_UI_SETTINGS = {
             <div className="md:w-[45%] flex flex-col h-full">
               <div className="relative border-2 border-green-700 bg-black h-full overflow-hidden rounded group flex-1">
                   {!currentWeaponAsset.charLoaded && <TacticalLoader className="absolute inset-0 z-20" />}
-                  {/* [수정] 스캔 애니메이션을 로딩 상태와 관계없이 항상 표시합니다. z-index를 15로 설정하여 이미지(10)보다는 위, 텍스트 오버레이(20)보다는 아래에 위치시킵니다. */}
-                  <div className="animate-scan pointer-events-none" style={{ zIndex: 15 }}></div>
                   {Object.entries(WEAPON_ASSETS).map(([key, asset]) => (
                       <img 
                           key={key}
@@ -1175,8 +1174,9 @@ export const GAME_OVER_UI_SETTINGS = {
               
               <div className="mb-16">
                   <div className="text-base font-bold tracking-widest mb-2 border-b border-green-900 pb-1 text-green-600">{GAME_TEXT.MENU.LOADOUT_HEADER}</div>
-                  <div className="grid grid-cols-4 gap-4 h-56">
-                      
+                  {/* [수정] 전체 무기 선택 그리드에 `overflow-hidden`을 추가하여 스캔 이펙트 범위를 제한합니다. */}
+                  <div className="grid grid-cols-4 gap-4 h-56 relative overflow-hidden">
+                      <div className="animate-scan pointer-events-none absolute inset-0 z-[15]"></div> {/* 단일 스캔 이펙트 */}
                       {Object.entries(WEAPONS).map(([key, weapon]) => {
                           const assetInfo = WEAPON_ASSETS[key as keyof typeof WEAPONS];
                           const isSelected = selectedWeaponKey === key;
@@ -1192,26 +1192,22 @@ export const GAME_OVER_UI_SETTINGS = {
                                   className={`relative h-full border-2 rounded flex flex-col cursor-pointer transition-all hover:bg-gray-800 overflow-hidden ${slotClasses}`}
                               >
                                   {!assetInfo.weaponLoaded && <WeaponLoader className="absolute inset-0" />}
-                                  {/* [수정] 스캔 애니메이션을 로딩 상태와 관계없이 항상 표시합니다. z-index를 5로 설정하고 pointer-events-none을 추가하여 클릭을 방해하지 않도록 합니다. */}
-                                  <div className="animate-scan pointer-events-none" style={{ zIndex: 5 }}></div>
                                   
-                                  {/* 내부 콘텐츠 컨테이너 (패딩 적용) */}
-                                  <div className="flex flex-col w-full h-full p-2">
-                                      {/* 무기 이름 */}
-                                      <div className="text-sm font-bold text-gray-300 w-full text-left flex-shrink-0 mb-1 leading-none">{weapon.name}</div>
+                                  <div className="relative z-10 flex flex-col w-full h-full p-2 bg-gray-900 gap-1 items-start">
+                                      <div className="h-5 text-sm font-bold text-gray-300 w-full text-left flex-shrink-0 leading-none whitespace-nowrap overflow-hidden text-ellipsis transform-gpu">{weapon.name}</div>
                                       
-                                      {/* 무기 아이콘 - flex-1과 min-h-0으로 남은 공간을 모두 차지하며 유연하게 크기 조절 */}
-                                      <div className="relative w-full flex-1 min-h-0 flex items-center justify-center overflow-hidden mb-1">
+                                      {/* [수정] 무기 아이콘 컨테이너의 높이를 `h-28`로 고정하고, 이미지에 `menuIconScale`을 적용합니다. */}
+                                      <div className="relative w-full h-28 flex items-center justify-center overflow-hidden">
                                           <img 
                                               src={assetInfo.weapon} 
                                               alt={weapon.name} 
                                               className={`w-full h-full object-contain drop-shadow-lg transition-opacity duration-300 ${assetInfo.weaponLoaded ? 'opacity-100' : 'opacity-0'}`}
+                                              style={{ transform: `scale(${weapon.menuIconScale || 1})` }}
                                               onLoad={() => assetInfo.setWeaponLoaded(true)}
                                           />
                                       </div>
                                       
-                                      {/* 능력치 바 */}
-                                      <div className="w-full space-y-1 flex-shrink-0">
+                                      <div className="w-full space-y-1 flex-shrink-0 mt-auto">
                                           <StatBar label="DMG" value={weapon.damage * (weapon.pelletCount || 1)} max={80} color="bg-red-500" />
                                           <StatBar label="RATE" value={weapon.fireRate} max={900} color="bg-yellow-500" invert />
                                           <StatBar label="MAG" value={weapon.maxAmmo} max={30} color="bg-blue-500" />
