@@ -1,5 +1,3 @@
-
-
 import React, { useRef, useEffect, useCallback } from 'react';
 import { Player, Zombie, Bullet, Particle, Shell, FloatingText, GameStatus, WeaponPart, UpgradeState, Item, ItemType } from '../types';
 import { GAME_SETTINGS, SOUND_SETTINGS, FLOATING_TEXT, RENDER_SETTINGS } from '../gameConfig';
@@ -60,15 +58,17 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
     level: 1,
     recoilOffset: 0,
     consecutiveShots: 0,
-    currentSpread: 0, // 현재 탄퍼짐(정확도) 상태, 0에 가까울수록 정확함
+    currentSpread: 0, // 현재 탄퍼짐 (라디안 단위). 이 값이 클수록 정확도가 낮아집니다.
     movementSpread: 0, // 이동으로 인한 탄퍼짐 패널티
-    renderedCrosshairRadius: 7, // 화면에 그려질 조준원 반지름 (애니메이션용)
-    currentRotationSpeed: PLAYER_STATS.baseRotationSpeed,
-    baseRotationSpeed: PLAYER_STATS.baseRotationSpeed,
-    maxRotationSpeed: PLAYER_STATS.maxRotationSpeed,
-    rotationAcceleration: PLAYER_STATS.rotationAcceleration,
-    activeTargetAngle: 0,
-    aimQueue: []
+    renderedCrosshairRadius: 7, // 화면에 실제로 그려질 조준원 반지름 (애니메이션용)
+
+    currentRotationSpeed: PLAYER_STATS.baseRotationSpeed, 
+    baseRotationSpeed: PLAYER_STATS.baseRotationSpeed,    
+    maxRotationSpeed: PLAYER_STATS.maxRotationSpeed,     
+    rotationAcceleration: PLAYER_STATS.rotationAcceleration, 
+
+    activeTargetAngle: 0, 
+    aimQueue: [] 
   });
 
   const zombiesRef = useRef<Zombie[]>([]);
@@ -271,7 +271,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
   };
 
   const initGame = useCallback(() => {
-    soundService.init();
+    // [삭제] soundService.init() 호출을 App.tsx로 이동. GameCanvas에서는 호출하지 않습니다.
+    // soundService.init();
 
     if (!backgroundCanvasRef.current) {
         generateGroundTexture();
@@ -384,7 +385,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
       }
     };
     const handleMouseDown = () => {
-       soundService.init();
+       // [삭제] soundService.init() 호출을 App.tsx로 이동. GameCanvas에서는 호출하지 않습니다.
+       // soundService.init();
        mouseDownRef.current = true;
     };
     const handleMouseUp = () => {
@@ -1525,6 +1527,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
       ctx.font = `bold ${ft.size}px "Do Hyeon", sans-serif`;
       ctx.fillStyle = ft.color;
       ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
       ctx.lineWidth = 2;
       ctx.strokeStyle = 'black';
       ctx.strokeText(ft.text, 0, 0);
@@ -1563,7 +1566,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
     ctx.fill();
     ctx.shadowBlur = 0;
 
-    ctx.fillStyle = '#1e293b';
+    ctx.fillStyle = '#1e293b'; 
     ctx.beginPath();
     ctx.arc(0, 8, 6, 0, Math.PI * 2);
     ctx.arc(0, -8, 6, 0, Math.PI * 2);
@@ -1679,7 +1682,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
     const canvas = canvasRef.current;
     if (canvas) {
         const ctx = canvas.getContext('2d');
-        if (ctx) {
+        if (ctx) { // [확인] Canvas 2D Context 획득 여부 방어 로직이 이미 존재합니다.
             draw(ctx);
             
             // 개발자 모드로 일시정지되었을 때 오버레이 표시
@@ -1700,6 +1703,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
                 ctx.fillText('일시 정지 (개발자 모드)', canvas.width / 2, canvas.height / 2);
                 ctx.restore();
             }
+        } else {
+            // Context가 null인 경우 경고 메시지 출력 (실제 화면에는 아무것도 그려지지 않을 것)
+            console.error("Canvas 2D context is null. Cannot draw.");
         }
     }
     requestRef.current = requestAnimationFrame(animate);
@@ -1721,7 +1727,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
     };
     window.addEventListener('resize', handleResize);
     handleResize();
-    if (gameStatus === GameStatus.MENU && waveRef.current === 1) {
+    // [수정] App.tsx에서 모든 초기화 로직을 담당하므로,
+    // GameCanvas에서는 게임 시작 시 initGame()만 호출하도록 변경합니다.
+    // 즉, gameStatus === GameStatus.MENU 조건에서 initGame()을 호출합니다.
+    if (gameStatus === GameStatus.MENU) {
         initGame();
     }
     return () => window.removeEventListener('resize', handleResize);

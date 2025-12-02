@@ -90,6 +90,8 @@ const App: React.FC = () => {
   const [finalReport, setFinalReport] = useState<{score: number, kills: number, wave: number} | null>(null);
   
   // 메뉴 화면 이미지 로딩 상태 (무기별로 분리)
+  // [수정] 이 상태들은 더 이상 전체 로딩 진행률에 사용되지 않고,
+  // 개별 UI 요소의 `onLoad` 핸들러에서만 사용됩니다.
   const [charLoaded, setCharLoaded] = useState(false);
   const [weaponLoaded, setWeaponLoaded] = useState(false);
   const [charMp5Loaded, setCharMp5Loaded] = useState(false);
@@ -190,18 +192,19 @@ const App: React.FC = () => {
       }
   };
 
+  // [수정] 모든 에셋 로딩을 중앙 집중화하는 새로운 useEffect
   useEffect(() => {
-    const preloadAssets = async () => {
-      const baseAssetUrls = Object.values(ASSETS);
-      // UPGRADE_CONFIG에서 아이콘 URL을 가져오도록 수정
+    const loadAllAssets = async () => {
+      setLoadingProgress(0); // 로딩 시작 시 진행률 초기화
+      const imageAssets = Object.values(ASSETS);
       const upgradeIconUrls = Object.values(UPGRADE_CONFIG).map(part => part.ICON);
-      const imageUrls = [...new Set([...baseAssetUrls, ...upgradeIconUrls])]; // 중복 제거
+      const allImageUrls = [...new Set([...imageAssets, ...upgradeIconUrls])];
 
-      const totalAssets = imageUrls.length;
+      const totalAssets = allImageUrls.length + Object.keys(WEAPONS).length + Object.keys(WEAPON_ASSETS).length; // 이미지 + 사운드 파일 (대략적인 계산)
       let loadedCount = 0;
-      
-      // 이미지 로딩 프로미스 배열 생성
-      const imagePromises = imageUrls.map(url => {
+
+      // 1. 이미지 프리로드
+      const imagePromises = allImageUrls.map(url => {
         return new Promise<void>((resolve) => {
           const img = new Image();
           img.src = url;
@@ -211,31 +214,40 @@ const App: React.FC = () => {
             resolve();
           };
           img.onerror = () => {
-            console.warn(`Failed to preload image: ${url}`);
-            loadedCount++; 
+            console.warn(`Failed to preload image: ${url}. Proceeding without it.`);
+            loadedCount++; // 실패했어도 카운트는 증가시켜 진행률은 업데이트
             setLoadingProgress(Math.round((loadedCount / totalAssets) * 100));
             resolve();
           };
         });
       });
-      
-      // [수정] 인위적인 최소 로딩 시간을 제거하고 실제 이미지 로딩만 기다립니다.
       await Promise.all(imagePromises);
-      setIsLoadingAssets(false);
-    };
-    preloadAssets();
-  }, []);
 
-  // 이 useEffect는 메뉴 화면에 처음 진입할 때만 실행됩니다.
-  // (미션 텍스트 생성, 사운드 로드, 업그레이드 초기화)
-  useEffect(() => {
-    if (gameStatus === GameStatus.MENU) {
-      // [수정] "신호 해독 중..." 애니메이션을 위한 인위적인 지연 시간 제거
-      setMissionText(getRandomText(GAME_TEXT.MISSION_BRIEFINGS));
+      // 2. SoundService 초기화 및 사운드 에셋 로딩
+      try {
+        await soundService.init(); // SoundService의 init()이 내부적으로 loadAssets()를 await합니다.
+        loadedCount += Object.keys(WEAPONS).length; // 사운드 에셋 로딩에 대한 대략적인 카운트
+        setLoadingProgress(Math.round((loadedCount / totalAssets) * 100));
+      } catch (error) {
+        console.error("SoundService initialization failed:", error);
+        // 사운드 로딩 실패 시에도 앱이 크래시되지 않고 진행되도록 합니다.
+      }
+
+      // 3. 커스텀 사운드 로딩 (IndexedDB에서)
+      try {
+        await soundService.loadCustomSoundsFromStorage();
+        loadedCount += Object.keys(WEAPON_ASSETS).length; // 커스텀 사운드 로딩에 대한 대략적인 카운트
+        setLoadingProgress(Math.round((loadedCount / totalAssets) * 100));
+      } catch (error) {
+        console.error("Failed to load custom sounds from storage:", error);
+      }
       
-      soundService.loadCustomSoundsFromStorage();
+      // 모든 로딩 완료 후 상태 업데이트
+      setIsLoadingAssets(false);
+      setWaitingForInput(false); // [수정] 모든 로딩이 완료되면 즉시 waitingForInput을 false로 설정
+      setMissionText(getRandomText(GAME_TEXT.MISSION_BRIEFINGS)); // 미션 텍스트도 이때 설정
       
-      // 업그레이드 초기화
+      // 업그레이드 초기화 (로딩 완료 시 한 번만)
       setUpgradeLevels({
         [WeaponPart.SCOPE]: 0,
         [WeaponPart.BARREL]: 0,
@@ -246,9 +258,12 @@ const App: React.FC = () => {
         [WeaponPart.GRIP]: 0,
         [WeaponPart.STOCK]: 0,
       });
-    }
-  }, [gameStatus]);
+    };
 
+    loadAllAssets();
+  }, []); // 컴포넌트가 처음 마운트될 때 한 번만 실행
+
+  // [삭제] 이전에 gameStatus === GameStatus.MENU일 때 사운드를 로드하던 useEffect는 위로 통합됨
   // 이 useEffect는 레벨업 화면이 뜰 때 실행됩니다.
   // (개발자 모드용 좌표 초기화 등)
   useEffect(() => {
@@ -346,14 +361,16 @@ const App: React.FC = () => {
   }, [gameStatus]);
 
   const handleInitClick = () => {
+    // [수정] 이제 모든 에셋 로딩은 useEffect에서 처리되므로,
+    // 이 함수는 단순히 `waitingForInput` 상태를 `false`로만 변경합니다.
     if (!isLoadingAssets) {
-      soundService.init(); 
       setWaitingForInput(false);
     }
   };
 
   const handleStartGame = () => {
-    soundService.init(); 
+    // [수정] 사운드 서비스는 이미 초기화되었으므로,
+    // `setGameStatus`만 호출합니다.
     setGameStatus(GameStatus.PLAYING);
   };
 
