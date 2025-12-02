@@ -17,7 +17,7 @@ export const GAME_TEXT = {
     SYSTEM_READY: "시스템 준비 완료 // 클릭하여 시작",
     INIT_SYSTEM: "전투 시스템 초기화 중...",
     ALL_GREEN: "모든 시스템 정상",
-    ASSET_LOADER: "에셋_로더_V2.1",
+    ASSET_LOADER_PREFIX: "에셋_로더_V", // [수정] 버전 번호가 없는 접두사로 변경
     ESTABLISHING: "업링크_연결_시도_중...",
     CONNECTED: "보안_연결_설정_완료",
   },

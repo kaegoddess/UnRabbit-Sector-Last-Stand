@@ -9,6 +9,7 @@ import { PistolIcon, MP5Icon, RifleIcon, ShotgunIcon, TacticalLoader, WeaponLoad
 import { soundService } from './services/SoundService';
 import { GAME_TEXT } from './config/textConfig';
 import { UPGRADE_CONFIG } from './config/upgradeConfig'; // 업그레이드 중앙 설정 파일 임포트
+import { GAME_VERSION } from './config/gameConfig'; // [NEW] 게임 버전 임포트
 
 interface UICasing {
   id: string;
@@ -691,7 +692,7 @@ export const GAME_OVER_UI_SETTINGS = {
                    <div className="h-full bg-green-500 transition-all duration-300 ease-out shadow-[0_0_10px_rgba(34,197,94,0.8)]" style={{ width: `${Math.max(5, loadingProgress)}%` }}></div>
                 </div>
                 <div className="flex justify-between text-[10px] text-gray-600 mt-1">
-                    <span>{GAME_TEXT.LOADING.ASSET_LOADER}</span>
+                    <span>{GAME_TEXT.LOADING.ASSET_LOADER_PREFIX}{GAME_VERSION}</span>
                     <span>{isLoadingAssets ? GAME_TEXT.LOADING.ESTABLISHING : GAME_TEXT.LOADING.CONNECTED}</span>
                 </div>
             </div>
@@ -1174,9 +1175,10 @@ export const GAME_OVER_UI_SETTINGS = {
               
               <div className="mb-16">
                   <div className="text-base font-bold tracking-widest mb-2 border-b border-green-900 pb-1 text-green-600">{GAME_TEXT.MENU.LOADOUT_HEADER}</div>
-                  {/* [수정] 전체 무기 선택 그리드에 `overflow-hidden`을 추가하여 스캔 이펙트 범위를 제한합니다. */}
+                  {/* [수정] 전체 무기 선택 그리드에 `relative` 및 `overflow-hidden`을 추가합니다. */}
                   <div className="grid grid-cols-4 gap-4 h-56 relative overflow-hidden">
-                      <div className="animate-scan pointer-events-none absolute inset-0 z-[15]"></div> {/* 단일 스캔 이펙트 */}
+                      {/* [수정] 스캔 이펙트를 각 슬롯에서 제거하고, 그리드 전체를 덮도록 단일화합니다. */}
+                      <div className="animate-scan pointer-events-none absolute inset-0 z-[15]"></div>
                       {Object.entries(WEAPONS).map(([key, weapon]) => {
                           const assetInfo = WEAPON_ASSETS[key as keyof typeof WEAPONS];
                           const isSelected = selectedWeaponKey === key;
@@ -1193,10 +1195,12 @@ export const GAME_OVER_UI_SETTINGS = {
                               >
                                   {!assetInfo.weaponLoaded && <WeaponLoader className="absolute inset-0" />}
                                   
+                                  {/* [수정] 콘텐츠 컨테이너에 `items-start`를 추가하여 상단 정렬을 강제합니다. */}
                                   <div className="relative z-10 flex flex-col w-full h-full p-2 bg-gray-900 gap-1 items-start">
+                                      {/* [유지] 텍스트가 흔들리지 않도록 고정 높이, 줄바꿈 방지 등의 클래스를 유지합니다. */}
                                       <div className="h-5 text-sm font-bold text-gray-300 w-full text-left flex-shrink-0 leading-none whitespace-nowrap overflow-hidden text-ellipsis transform-gpu">{weapon.name}</div>
                                       
-                                      {/* [수정] 무기 아이콘 컨테이너의 높이를 `h-28`로 고정하고, 이미지에 `menuIconScale`을 적용합니다. */}
+                                      {/* [수정] 무기 아이콘 컨테이너의 높이를 `h-28`로 고정합니다. */}
                                       <div className="relative w-full h-28 flex items-center justify-center overflow-hidden">
                                           <img 
                                               src={assetInfo.weapon} 
