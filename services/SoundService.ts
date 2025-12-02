@@ -6,6 +6,9 @@ class SoundService {
   private initialized: boolean = false;
   private dbName = 'UndeadSectorAudioDB';
   private storeName = 'audioFiles';
+  // [추가] 현재 페이지가 'file://' 프로토콜로 실행 중인지 확인하는 플래그입니다.
+  // 로컬 파일 환경에서는 브라우저 보안 정책으로 인해 fetch()나 IndexedDB 같은 기능이 제한됩니다.
+  private isLocalFile: boolean = window.location.protocol === 'file:';
 
   constructor() {
     // 생성자에서는 아무것도 하지 않음
@@ -41,8 +44,9 @@ class SoundService {
   // IndexedDB 헬퍼: DB 열기
   private openDB(): Promise<IDBDatabase> {
     return new Promise((resolve, reject) => {
-      if (!window.indexedDB) {
-        reject("IndexedDB not supported");
+      // [수정] 로컬 파일 환경이거나 IndexedDB를 지원하지 않는 경우, 즉시 거부(reject)하여 오류를 방지합니다.
+      if (this.isLocalFile || !window.indexedDB) {
+        reject(this.isLocalFile ? "IndexedDB is not available in file:// protocol" : "IndexedDB not supported");
         return;
       }
       const request = indexedDB.open(this.dbName, 1);
@@ -61,6 +65,12 @@ class SoundService {
   public async loadCustomSoundsFromStorage(): Promise<string[]> {
     this.ensureContext();
     if (!this.context) return [];
+    
+    // [추가] 로컬 파일 환경에서는 IndexedDB 접근을 시도하지 않습니다.
+    if (this.isLocalFile) {
+        console.log("로컬 파일 환경 감지: IndexedDB 접근을 건너뜁니다.");
+        return [];
+    }
 
     try {
       const db = await this.openDB();
@@ -101,7 +111,16 @@ class SoundService {
 
   // 설정 파일에 경로가 있다면 로드
   private async loadAssets() {
-    if (!this.context) return;
+    // [수정] 로컬 파일 환경('file://')에서는 fetch() API를 사용할 수 없으므로,
+    // 파일 로딩 시도를 건너뛰고 바로 함수를 종료합니다.
+    // 이렇게 하면 게임이 멈추지 않고, 사운드 파일이 없는 경우에 대비한
+    // 내장 신디사이저(합성음)가 자동으로 사용됩니다.
+    if (!this.context || this.isLocalFile) {
+      if (this.isLocalFile) {
+        console.log("로컬 파일 환경 감지: 사운드 에셋 fetch를 건너뛰고 내장 합성음을 사용합니다.");
+      }
+      return;
+    }
 
     const assets = SOUND_SETTINGS.assets as { [key: string]: string };
     
@@ -135,6 +154,12 @@ class SoundService {
   public async loadUserSound(key: string, file: File): Promise<boolean> {
     this.ensureContext();
     if (!this.context) return false;
+
+    // [추가] 로컬 파일 환경에서는 IndexedDB 저장을 시도하지 않습니다.
+    if (this.isLocalFile) {
+        console.warn("로컬 파일 환경에서는 사용자 사운드를 저장할 수 없습니다.");
+        return false;
+    }
 
     try {
       const arrayBuffer = await file.arrayBuffer();
@@ -188,6 +213,7 @@ class SoundService {
       case 'itemPickup':
         this.synthItemPickup();
         break;
+      // [수정] 'uiSelect' 사운드 파일 로드 실패 시 재생될 합성음(synth)을 추가합니다.
       case 'uiSelect':
         this.synthUiSelect();
         break;
