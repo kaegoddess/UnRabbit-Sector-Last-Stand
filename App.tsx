@@ -803,8 +803,8 @@ export const GAME_OVER_UI_SETTINGS = {
           <div className="flex justify-between items-end w-full">
             <div className="flex items-end">
                 {/* HUD 컨테이너 min-width 증가 및 내부 아이콘 크기 조정 */}
-                <div className="flex items-center gap-2 bg-black/70 backdrop-blur-md py-2 px-4 pr-8 rounded-tr-3xl shadow-2xl min-w-[440px]">
-                    <div className="flex flex-col items-center w-60 shrink-0">
+                <div className="flex items-center gap-2 bg-black/70 backdrop-blur-md pb-2 px-4 pr-8 rounded-tr-3xl shadow-2xl min-w-[440px]">
+                    <div className="flex flex-col items-center justify-center w-60 shrink-0">
                       {/* 무기 아이콘 확대 (w-48 -> w-60, h-28 -> h-32) 및 내부 이미지 스케일 업 */}
                       <div className="w-full h-32 flex items-center justify-center">
                           {/* 설정 파일에서 가져온 hudIconScale 값으로 이미지 크기를 동적으로 조절합니다. */}
@@ -813,16 +813,10 @@ export const GAME_OVER_UI_SETTINGS = {
                             style={{ transform: `scale(${hudIconScale})` }}
                           /> 
                       </div>
-                      {/* 레벨 및 경험치 바 */}
-                      <div className="w-full mt-2 space-y-1">
-                        <div className="text-center text-xs text-yellow-500 font-bold">{GAME_TEXT.HUD.LEVEL} {stats.level}</div>
-                        <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                          <div className="h-full bg-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.8)]" style={{ width: `${Math.min(100, (stats.xp / stats.maxXp) * 100)}%` }}></div>
-                        </div>
-                      </div>
                     </div>
                     <div className="w-px h-20 bg-gray-600/50"></div>
-                    <div className="flex flex-col gap-1 flex-1 justify-center -mt-1">
+                    {/* [수정] 무기 정보 컨테이너: justify-center 제거하여 상단 정렬 */}
+                    <div className="flex flex-col gap-1 flex-1">
                       <div className="flex justify-between items-end border-b border-gray-600/50 pb-1">
                           <div className="flex flex-col mb-1">
                               <span className="text-2xl font-black text-white tracking-wider leading-none">{WEAPONS[selectedWeaponKey].name}</span>
@@ -834,8 +828,31 @@ export const GAME_OVER_UI_SETTINGS = {
                               <span className="text-xl text-gray-500 ml-1">/{stats.maxAmmo}</span>
                           </div>
                       </div>
-                      {/* --- 새로운 2열 탄약 UI (직사각형 + 입체감) --- */}
-                      <div id="ammo-container" className="flex flex-col gap-1 mt-1 h-auto">
+                      
+                      {/* [수정] 레벨과 경험치 바를 한 줄에 나란히 배치하고, 상단 여백(mt-1)을 제거하여 더 컴팩트하게 만듭니다. */}
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-yellow-600 font-bold text-lg">LV.</span>
+                          <span className="text-yellow-400 font-black text-4xl text-shadow-glow tracking-wider">
+                            {stats.level.toString().padStart(2, '0')}
+                          </span>
+                        </div>
+                        {/* 경험치 바 컨테이너 */}
+                        <div className="flex-1 relative">
+                            <div className="w-full h-4 bg-gray-800/50 rounded-full overflow-hidden border-2 border-gray-900/80 relative shadow-inner">
+                              <div 
+                                className="h-full bg-gradient-to-r from-yellow-500 to-yellow-300 shadow-[0_0_8px_rgba(250,204,21,0.6)] transition-all duration-300" 
+                                style={{ width: `${Math.min(100, (stats.xp / stats.maxXp) * 100)}%` }}
+                              ></div>
+                              <div className="absolute inset-0 flex items-center justify-center text-sm text-white font-bold drop-shadow-[0_1px_1px_black]">
+                                {stats.xp} / {stats.maxXp}
+                              </div>
+                            </div>
+                        </div>
+                      </div>
+
+                      {/* [수정] 탄약 UI의 상단 여백(mt-1)을 제거합니다. */}
+                      <div id="ammo-container" className="flex flex-col gap-1 h-auto">
                             {/* Top Row (홀수 번호 총알: 1, 3, 5...) */}
                             <div className="flex gap-1 h-6">
                                 {Array.from({ length: bulletsInFirstRow }).map((_, i) => {

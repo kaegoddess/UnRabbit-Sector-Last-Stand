@@ -64,6 +64,12 @@
         pointer-events: none;
         z-index: 5;
       }
+      .text-shadow-glow {
+        /* 옅은 노란색 빛 번짐 효과를 추가하여 텍스트를 돋보이게 합니다. */
+        /* 0 0 5px: 첫 번째 그림자는 텍스트에 가장 가깝고 가장 밝습니다. (x-offset, y-offset, blur-radius, color) */
+        /* 0 0 10px: 두 번째 그림자는 더 넓게 퍼져 부드러운 후광을 만듭니다. */
+        text-shadow: 0 0 5px rgba(250, 204, 21, 0.5), 0 0 10px rgba(250, 204, 21, 0.3);
+      }
     </style>
   <script type="importmap">
 {
