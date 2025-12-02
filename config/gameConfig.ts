@@ -48,7 +48,7 @@ export const GAME_SETTINGS = {
   scoreToNextWave: 10, 
 
   // [NEW] 빠른 재장전 시스템 설정
-  quickReloadInputMinProgress: 0.3, // 재장전 진행도 30% 전까지는 빠른 재장전 입력 무시
+  quickReloadInputMinProgress: 0.4, // 재장전 진행도 30% 전까지는 빠른 재장전 입력 무시
   quickReloadShakeDuration: 0.3, // 빠른 재장전 실패 시 재장전 바 흔들림 지속 시간 (초)
   quickReloadPostSuccessCooldown: 0.25, // 빠른 재장전 성공 후 총알 발사 방지 쿨다운 (초)
 };

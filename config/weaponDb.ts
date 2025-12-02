@@ -104,8 +104,8 @@ export const WEAPON_DATABASE = {
       maxAmmo: 8, // 최대 장탄수
       reloadTime: 1200, // 재장전 시간 (ms)
       // [NEW] 빠른 재장전 시스템 설정
-      quickReloadMinTimePercent: 0.3, // 빠른 재장전 화살표 표시 최소 진행도 (30%)
-      quickReloadMaxTimePercent: 0.7, // 빠른 재장전 화살표 표시 최대 진행도 (70%)
+      quickReloadMinTimePercent: 0.45, // 빠른 재장전 화살표 표시 최소 진행도 (30%)
+      quickReloadMaxTimePercent: 0.8, // 빠른 재장전 화살표 표시 최대 진행도 (70%)
       quickReloadDifficultyPercent: 0.2, // 빠른 재장전 성공 범위 크기 (15%)
     },
     // 5. 시각 효과 (총구 화염, 탄피, 레이저 등 눈에 보이는 모든 효과)
@@ -168,8 +168,8 @@ export const WEAPON_DATABASE = {
       maxAmmo: 30,
       reloadTime: 1500,
       // [NEW] 빠른 재장전 시스템 설정
-      quickReloadMinTimePercent: 0.3, // 40%
-      quickReloadMaxTimePercent: 0.6, // 80%
+      quickReloadMinTimePercent: 0.4, // 40%
+      quickReloadMaxTimePercent: 0.7, // 80%
       quickReloadDifficultyPercent: 0.10, // 10%
     },
     visuals: {
@@ -233,8 +233,8 @@ export const WEAPON_DATABASE = {
       reloadTime: 2500,
       // [NEW] 빠른 재장전 시스템 설정
       quickReloadMinTimePercent: 0.5, // 50%
-      quickReloadMaxTimePercent: 0.6, // 60%
-      quickReloadDifficultyPercent: 0.06, // 6%
+      quickReloadMaxTimePercent: 0.7, // 60%
+      quickReloadDifficultyPercent: 0.1, // 6%
     },
     visuals: {
       menuIconScale: 1.4, // [NEW] 메인 메뉴 아이콘 크기 배율.
@@ -294,7 +294,7 @@ export const WEAPON_DATABASE = {
       maxAmmo: 6,
       reloadTime: 2000, // 재장전 느림
       // [NEW] 빠른 재장전 시스템 설정
-      quickReloadMinTimePercent: 0.5, // 20%
+      quickReloadMinTimePercent: 0.4, // 20%
       quickReloadMaxTimePercent: 0.8, // 60%
       quickReloadDifficultyPercent: 0.10, // 20%
     },
