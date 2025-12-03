@@ -1,8 +1,8 @@
 import React, { useRef, useEffect, useCallback } from 'react';
-import { Player, Zombie, Bullet, Particle, Shell, FloatingText, GameStatus, WeaponPart, UpgradeState, Item, ItemType } from '../types';
+import { Player, Zombie, Bullet, Particle, Shell, FloatingText, GameStatus, WeaponPart, UpgradeState, Item, ItemType, GameStats } from '../types';
 import { GAME_SETTINGS, SOUND_SETTINGS, FLOATING_TEXT, RENDER_SETTINGS } from '../config/gameConfig';
 import { ZOMBIE_STATS } from '../config/zombieConfig';
-import { PLAYER_STATS } from '../config/playerConfig';
+import { PLAYER_STATS, PLAYER_UI_SETTINGS, PLAYER_EFFECTS } from '../config/playerConfig';
 import { WEAPONS } from '../config/weaponConfig';
 import { soundService } from '../services/SoundService';
 import { GAME_TEXT } from '../config/textConfig';
@@ -14,7 +14,7 @@ interface GameCanvasProps {
   selectedWeaponId: string; // 'Pistol' | 'MP5' etc
   upgradeLevels: UpgradeState; // 부품별 업그레이드 레벨
   setGameStatus: (status: GameStatus) => void;
-  onUpdateStats: (stats: { health: number; ammo: number; maxAmmo: number; score: number; wave: number; xp: number; maxXp: number; level: number }) => void;
+  onUpdateStats: (stats: { health: number; ammo: number; maxAmmo: number; score: number; wave: number; xp: number; maxXp: number; level: number; stamina: number; maxStamina: number; }) => void;
   onGameOver: (finalScore: number, kills: number, wave: number) => void;
   onShoot: (firedAmmoIndex: number) => void; // 발사 이벤트 콜백 (UI 탄피 연출용)
   isPaused: boolean; // 게임 일시정지 상태 (개발자 모드 또는 레벨업)
@@ -56,6 +56,20 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
     xp: 0,
     maxXp: 100, // Level 1 XP
     level: 1,
+
+    // [FIX] Player 타입에 정의된 스테미나 및 닷지 관련 속성들이 누락되어 발생하는 타입 오류를 수정합니다.
+    // 각 속성에 대한 초기값을 설정하여 playerRef가 Player 인터페이스를 완전히 만족하도록 합니다.
+    stamina: PLAYER_STATS.maxStamina,
+    maxStamina: PLAYER_STATS.maxStamina,
+    isSprinting: false,
+    staminaRechargeDelayTimer: 0,
+    isDodging: false,
+    dodgeTimer: 0,
+    dodgeDuration: PLAYER_STATS.dodgeDuration,
+    dodgeInvulnerabilityTimer: 0,
+    dodgeDirection: { x: 0, y: 0 },
+    dodgeScale: 1, // 닷지 시 캐릭터 크기 애니메이션용
+
     recoilOffset: 0,
     consecutiveShots: 0,
     currentSpread: 0, // 현재 탄퍼짐 (라디안 단위). 이 값이 클수록 정확도가 낮아집니다.
@@ -96,6 +110,58 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
   const lastFootstepTimeRef = useRef<number>(0);
   const lastHitTimeRef = useRef<number>(0);
   const playerDamageAccumulatorRef = useRef<number>(0);
+  // [NEW] 전력질주 충돌 사운드 재생 쿨다운을 위한 Ref
+  const lastSprintCollideTimeRef = useRef<number>(0);
+
+
+  // [NEW] 닷지 함수
+  const dodge = () => {
+    const player = playerRef.current;
+    // 닷지 중이거나, 재장전 중이거나, 스테미나가 부족하면 닷지할 수 없습니다.
+    if (player.isDodging || player.isReloading || player.stamina < PLAYER_STATS.dodgeStaminaCost) {
+      return;
+    }
+
+    // 닷지 시작
+    player.isDodging = true;
+    player.stamina -= PLAYER_STATS.dodgeStaminaCost;
+    player.staminaRechargeDelayTimer = PLAYER_STATS.staminaRechargeDelay;
+    player.dodgeTimer = PLAYER_STATS.dodgeDuration;
+    
+    // 조준점 방향으로 닷지 방향 설정
+    player.dodgeDirection = {
+      x: Math.cos(player.rotation),
+      y: Math.sin(player.rotation)
+    };
+    
+    soundService.play('dodge');
+
+    // 닷지 시작 시 바람 파티클 생성
+    const particleCount = 20;
+    const baseAngle = player.rotation + Math.PI; // 플레이어 뒤쪽 방향
+    for (let i = 0; i < particleCount; i++) {
+      const angle = baseAngle + (Math.random() - 0.5) * 1.5;
+      const speed = 150 + Math.random() * 100;
+      const life = 0.3 + Math.random() * 0.2;
+      particlesRef.current.push({
+        id: 'dodge-wind-' + Math.random(),
+        x: player.x,
+        y: player.y,
+        radius: Math.random() * 2 + 1,
+        color: 'rgba(255, 255, 255, 0.7)',
+        rotation: 0,
+        markedForDeletion: false,
+        velocity: {
+          x: Math.cos(angle) * speed,
+          y: Math.sin(angle) * speed,
+        },
+        life: life,
+        maxLife: life,
+        alpha: 0.7,
+        growth: -3,
+      });
+    }
+  };
 
   const screenShakeRef = useRef({
     intensity: 0,
@@ -309,6 +375,20 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
       xp: 0,
       maxXp: 100,
       level: 1,
+
+      // [FIX] Player 타입에 정의된 스테미나 및 닷지 관련 속성들이 누락되어 발생하는 타입 오류를 수정합니다.
+      // 게임 시작 시 모든 플레이어 상태를 초기화하기 위해 관련 속성들의 초기값을 설정합니다.
+      stamina: PLAYER_STATS.maxStamina,
+      maxStamina: PLAYER_STATS.maxStamina,
+      isSprinting: false,
+      staminaRechargeDelayTimer: 0,
+      isDodging: false,
+      dodgeTimer: 0,
+      dodgeDuration: PLAYER_STATS.dodgeDuration,
+      dodgeInvulnerabilityTimer: 0,
+      dodgeDirection: { x: 0, y: 0 },
+      dodgeScale: 1,
+
       recoilOffset: 0,
       consecutiveShots: 0,
       currentSpread: 0, // 반동 초기화
@@ -340,6 +420,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
     previousTimeRef.current = null;
     lastSpawnTimeRef.current = 0;
     playerDamageAccumulatorRef.current = 0;
+    lastSprintCollideTimeRef.current = 0; // [NEW] 충돌 사운드 타이머 초기화
     screenShakeRef.current = { intensity: 0, duration: 0, startX: 0, startY: 0 };
   }, [calculateWeaponStats]); 
 
@@ -390,6 +471,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
     const handleKeyUp = (e: KeyboardEvent) => { 
       keysRef.current[e.code] = false; 
       if (e.code === 'KeyR') reload();
+      // [NEW] 닷지 입력
+      if (e.code === 'Space') dodge();
     };
     const handleMouseMove = (e: MouseEvent) => {
       if (canvasRef.current) {
@@ -427,7 +510,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
 
   const reload = () => {
     const player = playerRef.current;
-    if (player.isReloading || player.ammo === player.maxAmmo) return;
+    if (player.isReloading || player.ammo === player.maxAmmo || player.isDodging) return;
     
     player.isReloading = true;
     soundService.play('reload');
@@ -485,6 +568,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
     if (gameStatus !== GameStatus.PLAYING) return;
     
     const player = playerRef.current;
+    if (player.isDodging) return; // [NEW] 닷지 중에는 발사 불가
+    
     const effectiveStats = calculateWeaponStats(player.level);
     const now = Date.now();
 
@@ -727,14 +812,18 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
       hitTimer: 0,
       slowTimer: 0,
       slowFactor: 1.0,
-      xp: stats.xp || 10 // 경험치
+      xp: stats.xp || 10, // 경험치
+      // [NEW] 넉백 상태 초기화
+      knockbackVelocity: { x: 0, y: 0 },
+      knockbackTimer: 0,
     });
   };
 
-  const createParticles = (x: number, y: number, color: string, count: number) => {
+  const createParticles = (x: number, y: number, color: string, count: number, config?: {speed?: number, life?: number, growth?: number}) => {
+    const finalConfig = { ...PLAYER_EFFECTS.default, ...config };
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = Math.random() * GAME_SETTINGS.particleSpeed;
+      const speed = (finalConfig.speed) * (0.5 + Math.random());
       particlesRef.current.push({
         id: Math.random().toString(),
         x,
@@ -747,13 +836,14 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
           x: Math.cos(angle) * speed,
           y: Math.sin(angle) * speed
         },
-        life: 1.0,
-        maxLife: 1.0,
+        life: finalConfig.life,
+        maxLife: finalConfig.life,
         alpha: 1,
-        growth: 0
+        growth: finalConfig.growth,
       });
     }
   };
+
 
   // 회복 아이템 획득 시 시각 효과
   const createHealingParticles = (x: number, y: number) => {
@@ -842,14 +932,86 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
     if (keysRef.current['KeyA'] || keysRef.current['ArrowLeft']) dx -= 1;
     if (keysRef.current['KeyD'] || keysRef.current['ArrowRight']) dx += 1;
 
-    let isMoving = false;
-    if (dx !== 0 || dy !== 0) {
-      isMoving = true;
+    let isMoving = dx !== 0 || dy !== 0;
+
+    // --- [NEW] 닷지 로직 ---
+    if (player.isDodging) {
+      player.dodgeTimer -= deltaTime;
+      
+      const dodgeProgress = 1 - (player.dodgeTimer / PLAYER_STATS.dodgeDuration);
+      player.dodgeScale = 1 + 0.3 * Math.sin(dodgeProgress * Math.PI);
+
+      const currentDodgeSpeed = player.speed * PLAYER_STATS.dodgeSpeedMultiplier;
+      player.x += player.dodgeDirection.x * currentDodgeSpeed * deltaTime;
+      player.y += player.dodgeDirection.y * currentDodgeSpeed * deltaTime;
+      
+      if (player.dodgeTimer <= 0) {
+        player.isDodging = false;
+        player.dodgeScale = 1;
+        soundService.play('dodgeLand');
+        
+        // 착지 이펙트
+        const effect = PLAYER_EFFECTS.dodgeLand;
+        createParticles(player.x, player.y, effect.color, effect.count, { speed: effect.speed, life: effect.life, growth: effect.growth });
+
+        // 주변 넉백 및 데미지
+        zombiesRef.current.forEach(z => {
+          const dist = Math.hypot(player.x - z.x, player.y - z.y);
+          if (dist < PLAYER_STATS.dodgeLandKnockbackRadius) {
+            z.health -= PLAYER_STATS.dodgeLandDamage;
+            createFloatingText(z.x, z.y, Math.floor(PLAYER_STATS.dodgeLandDamage).toString(), false, '#f59e0b');
+            
+            // [MODIFIED] 부드러운 넉백 로직으로 변경
+            // 즉시 위치를 바꾸는 대신, 넉백 속도와 타이머를 설정합니다.
+            const angle = Math.atan2(z.y - player.y, z.x - player.x);
+            const knockbackDuration = PLAYER_STATS.dodgeLandKnockbackDuration;
+            if (knockbackDuration > 0) {
+              const knockbackSpeed = PLAYER_STATS.dodgeLandKnockback / knockbackDuration;
+              z.knockbackVelocity = {
+                x: Math.cos(angle) * knockbackSpeed,
+                y: Math.sin(angle) * knockbackSpeed,
+              };
+              z.knockbackTimer = knockbackDuration;
+            }
+          }
+        });
+      }
+    }
+
+    // --- [NEW] 전력질주 로직 ---
+    const isSprintingInput = (keysRef.current['ShiftLeft'] || keysRef.current['ShiftRight']) && isMoving && !player.isReloading && !player.isDodging;
+    player.isSprinting = isSprintingInput && player.stamina > 0;
+
+    if (player.isSprinting) {
+      player.stamina = Math.max(0, player.stamina - PLAYER_STATS.sprintStaminaCost * deltaTime);
+      player.staminaRechargeDelayTimer = PLAYER_STATS.staminaRechargeDelay;
+      
+      // 먼지 이펙트
+      const effect = PLAYER_EFFECTS.sprintDust;
+      if (Math.random() < effect.chance) {
+        createParticles(player.x, player.y, effect.color, effect.count, { speed: effect.speed, life: effect.life, growth: effect.growth });
+      }
+
+    } else if (player.stamina < player.maxStamina) {
+      if (player.staminaRechargeDelayTimer > 0) {
+        player.staminaRechargeDelayTimer -= deltaTime;
+      } else {
+        player.stamina = Math.min(player.maxStamina, player.stamina + PLAYER_STATS.staminaRechargeRate * deltaTime);
+      }
+    }
+
+    // --- 일반 이동 로직 ---
+    let currentSpeed = player.speed;
+    if (player.isSprinting) {
+      currentSpeed *= PLAYER_STATS.sprintSpeedMultiplier;
+    }
+    
+    if (isMoving && !player.isDodging) {
       const length = Math.sqrt(dx * dx + dy * dy);
       dx /= length;
       dy /= length;
-      player.x += dx * player.speed * deltaTime;
-      player.y += dy * player.speed * deltaTime;
+      player.x += dx * currentSpeed * deltaTime;
+      player.y += dy * currentSpeed * deltaTime;
     }
 
     if (mouseDownRef.current) {
@@ -877,7 +1039,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
 
     // 1. 사격으로 인한 반동 회복 (부드럽게)
     const isTryingToShoot = mouseDownRef.current;
-    const canActuallyShoot = !player.isReloading && player.ammo > 0;
+    const canActuallyShoot = !player.isReloading && player.ammo > 0 && !player.isDodging;
 
     if ((!isTryingToShoot || !canActuallyShoot) && player.consecutiveShots > 0) {
       if (now - lastShotTimeRef.current > effectiveStats.recoilResetTime) {
@@ -893,7 +1055,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
     const stability = effectiveStats.movementStability; // 예: 5 (초)
     const maxMoveSpread = effectiveStats.maxSpreadMoving; // 예: 0.8
 
-    if (isMoving) {
+    if (isMoving && !player.isDodging) {
         // `stability` 초 만에 0에서 `maxMoveSpread`까지 탄퍼짐이 증가합니다.
         // 초당 증가량 = 최대 탄퍼짐 / 안정성(시간)
         const increaseRate = (stability > 0) ? (maxMoveSpread / stability) : maxMoveSpread;
@@ -954,7 +1116,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
     }
 
 
-    if (isMoving && now - lastFootstepTimeRef.current > SOUND_SETTINGS.footstepInterval) {
+    if (isMoving && !player.isDodging && now - lastFootstepTimeRef.current > SOUND_SETTINGS.footstepInterval) {
       soundService.play('footstep');
       lastFootstepTimeRef.current = now;
     }
@@ -1129,40 +1291,76 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
       lastSpawnTimeRef.current = now;
     }
 
+    // [NEW] 이번 프레임에 전력질주 충돌이 있었는지 추적하는 플래그
+    let sprintCollidedThisFrame = false;
+
     zombiesRef.current.forEach(z => {
       if (z.hitTimer > 0) z.hitTimer -= deltaTime;
       if (z.slowTimer > 0) z.slowTimer -= deltaTime;
 
-      const angle = Math.atan2(player.y - z.y, player.x - z.x);
-      z.rotation = angle;
-      
-      let currentSpeed = z.speed;
-      if (z.slowTimer > 0) currentSpeed *= z.slowFactor;
+      // [NEW] 부드러운 넉백 로직
+      if (z.knockbackTimer > 0) {
+        // 넉백 상태일 경우, 넉백 속도를 적용하고 일반 이동은 건너뜁니다.
+        z.x += z.knockbackVelocity.x * deltaTime;
+        z.y += z.knockbackVelocity.y * deltaTime;
 
-      const moveAmount = currentSpeed * deltaTime;
-      z.x += Math.cos(angle) * moveAmount;
-      z.y += Math.sin(angle) * moveAmount;
+        // 마찰력 적용 (속도가 점차 줄어듦)
+        z.knockbackVelocity.x *= 0.9;
+        z.knockbackVelocity.y *= 0.9;
+
+        z.knockbackTimer -= deltaTime;
+        if (z.knockbackTimer <= 0) {
+            z.knockbackVelocity = { x: 0, y: 0 };
+        }
+      } else {
+        // 일반 이동 로직
+        const angle = Math.atan2(player.y - z.y, player.x - z.x);
+        z.rotation = angle;
+        
+        let currentSpeed = z.speed;
+        if (z.slowTimer > 0) currentSpeed *= z.slowFactor;
+
+        const moveAmount = currentSpeed * deltaTime;
+        z.x += Math.cos(angle) * moveAmount;
+        z.y += Math.sin(angle) * moveAmount;
+      }
+
 
       const distToPlayer = Math.hypot(player.x - z.x, player.y - z.y);
-      if (distToPlayer < player.radius + z.radius) {
-        player.health -= 0.5;
-        playerDamageAccumulatorRef.current += 0.5;
-        if (playerDamageAccumulatorRef.current >= 5) {
-            createFloatingText(player.x, player.y - 30, `-${Math.floor(playerDamageAccumulatorRef.current)}`, false, '#ef4444');
-            playerDamageAccumulatorRef.current = 0;
-        }
+      
+      // [NEW] 닷지 무적 판정
+      const dodgeProgressTime = PLAYER_STATS.dodgeDuration - player.dodgeTimer;
+      const isInvulnerable = player.isDodging && 
+                             dodgeProgressTime > PLAYER_STATS.dodgeInvulnerabilityStartTime && 
+                             dodgeProgressTime < (PLAYER_STATS.dodgeInvulnerabilityStartTime + PLAYER_STATS.dodgeInvulnerabilityDuration);
 
-        if (now - lastHitTimeRef.current > 500) {
-            soundService.play('playerHit');
-            lastHitTimeRef.current = now;
-        }
+      if (distToPlayer < player.radius + z.radius && !isInvulnerable) {
+        // [NEW] 전력질주 넉백
+        if(player.isSprinting) {
+            const knockbackAngle = Math.atan2(z.y - player.y, z.x - player.x);
+            z.x += Math.cos(knockbackAngle) * PLAYER_STATS.sprintKnockback;
+            z.y += Math.sin(knockbackAngle) * PLAYER_STATS.sprintKnockback;
+            sprintCollidedThisFrame = true; // [NEW] 충돌 플래그 설정
+        } else {
+            player.health -= 0.5;
+            playerDamageAccumulatorRef.current += 0.5;
+            if (playerDamageAccumulatorRef.current >= 5) {
+                createFloatingText(player.x, player.y - 30, `-${Math.floor(playerDamageAccumulatorRef.current)}`, false, '#ef4444');
+                playerDamageAccumulatorRef.current = 0;
+            }
 
-        z.x -= Math.cos(angle) * 10;
-        z.y -= Math.sin(angle) * 10;
-        createParticles(player.x, player.y, '#ef4444', GAME_SETTINGS.particleCount.blood);
-        
-        if (player.health <= 0) {
-          onGameOver(player.score, killsRef.current, waveRef.current);
+            if (now - lastHitTimeRef.current > 500) {
+                soundService.play('playerHit');
+                lastHitTimeRef.current = now;
+            }
+
+            z.x -= Math.cos(z.rotation) * 10;
+            z.y -= Math.sin(z.rotation) * 10;
+            createParticles(player.x, player.y, '#ef4444', 5);
+            
+            if (player.health <= 0) {
+              onGameOver(player.score, killsRef.current, waveRef.current);
+            }
         }
       }
 
@@ -1294,6 +1492,12 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
       });
     });
 
+    // [NEW] 전력질주 충돌 사운드 재생 (쿨다운 적용)
+    if (sprintCollidedThisFrame && now - lastSprintCollideTimeRef.current > SOUND_SETTINGS.sprintCollideCooldown) {
+      soundService.play('sprintCollide');
+      lastSprintCollideTimeRef.current = now;
+    }
+
     particlesRef.current.forEach(p => {
       p.x += p.velocity.x * deltaTime;
       p.y += p.velocity.y * deltaTime;
@@ -1320,12 +1524,14 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
     onUpdateStats({
       health: player.health,
       ammo: player.ammo,
-      maxAmmo: player.maxAmmo, // 업그레이드된 maxAmmo를 App으로 전달
+      maxAmmo: player.maxAmmo,
       score: player.score,
       wave: waveRef.current,
       xp: player.xp,
       maxXp: player.maxXp,
-      level: player.level
+      level: player.level,
+      stamina: player.stamina,
+      maxStamina: player.maxStamina,
     });
   };
 
@@ -1626,21 +1832,29 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
     const p = playerRef.current;
 
     // 플레이어 그림자 그리기 (입체감 부여)
+    const shadowScale = p.dodgeScale * RENDER_SETTINGS.shadowScale;
     ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
     ctx.beginPath();
-    // 설정 파일에서 오프셋과 크기 배율을 가져와 적용합니다.
     ctx.ellipse(
         p.x + RENDER_SETTINGS.shadowOffset.x,
         p.y + RENDER_SETTINGS.shadowOffset.y,
-        p.radius * RENDER_SETTINGS.shadowScale,
-        p.radius * RENDER_SETTINGS.shadowScale * 0.5, // 타원 비율 유지
+        p.radius * shadowScale,
+        p.radius * shadowScale * 0.5,
         0, 0, Math.PI * 2
     );
     ctx.fill();
     
     ctx.save();
     ctx.translate(p.x, p.y);
+    // [NEW] 닷지 시 점프 효과를 위해 y축 오프셋 추가
+    if (p.isDodging) {
+      const dodgeProgress = 1 - (p.dodgeTimer / PLAYER_STATS.dodgeDuration);
+      const jumpHeight = 15 * Math.sin(dodgeProgress * Math.PI);
+      ctx.translate(0, -jumpHeight);
+    }
     ctx.rotate(p.rotation);
+    ctx.scale(p.dodgeScale, p.dodgeScale); // [NEW] 닷지 스케일 적용
+
 
     ctx.fillStyle = p.color;
     ctx.shadowBlur = 10;
@@ -1708,6 +1922,57 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
     ctx.fill();
 
     ctx.restore();
+    
+    // --- [NEW] 스테미나 UI 그리기 ---
+    const gaugeCfg = PLAYER_UI_SETTINGS.staminaGauge;
+    const gaugeX = p.x + gaugeCfg.offsetX;
+    const gaugeY = p.y + gaugeCfg.offsetY;
+    const numSegments = Math.ceil(p.maxStamina / gaugeCfg.staminaPerSegment);
+    const filledSegments = Math.floor(p.stamina / gaugeCfg.staminaPerSegment);
+    const partialSegmentFill = (p.stamina % gaugeCfg.staminaPerSegment) / gaugeCfg.staminaPerSegment;
+    
+    ctx.save();
+    ctx.translate(gaugeX, gaugeY);
+    ctx.lineWidth = gaugeCfg.lineWidth;
+
+    // 배경 (빈 칸)
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.beginPath();
+    ctx.arc(0, 0, gaugeCfg.radius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // 채워진 칸
+    for(let i = 0; i < filledSegments; i++) {
+        ctx.strokeStyle = 'rgba(251, 191, 36, 1)'; // amber-400
+        const startAngle = (i / numSegments) * Math.PI * 2 - Math.PI / 2;
+        const endAngle = ((i + 1) / numSegments) * Math.PI * 2 - Math.PI / 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, gaugeCfg.radius, startAngle, endAngle);
+        ctx.stroke();
+    }
+    
+    // 부분적으로 채워진 칸
+    if (partialSegmentFill > 0 && filledSegments < numSegments) {
+        ctx.strokeStyle = 'rgba(251, 191, 36, 1)';
+        const startAngle = (filledSegments / numSegments) * Math.PI * 2 - Math.PI / 2;
+        const endAngle = startAngle + (partialSegmentFill / numSegments) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, gaugeCfg.radius, startAngle, endAngle);
+        ctx.stroke();
+    }
+    
+    // 칸 구분선
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.lineWidth = 1;
+    for(let i = 1; i <= numSegments; i++) {
+        const angle = (i / numSegments) * Math.PI * 2 - Math.PI / 2;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(angle) * (gaugeCfg.radius - gaugeCfg.lineWidth / 2), Math.sin(angle) * (gaugeCfg.radius - gaugeCfg.lineWidth / 2));
+        ctx.lineTo(Math.cos(angle) * (gaugeCfg.radius + gaugeCfg.lineWidth / 2), Math.sin(angle) * (gaugeCfg.radius + gaugeCfg.lineWidth / 2));
+        ctx.stroke();
+    }
+    ctx.restore();
+
 
     if (p.isReloading) {
         // [NEW] 설정 파일에서 스케일 값들을 가져와 적용합니다.
@@ -1832,7 +2097,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
         }
     }
     requestRef.current = requestAnimationFrame(animate);
-  }, [gameStatus, isPaused, calculateWeaponStats, update, draw]); // 종속성 추가: update, draw
+  }, [gameStatus, isPaused, calculateWeaponStats]); // 종속성에서 update, draw 제거
 
   useEffect(() => {
     requestRef.current = requestAnimationFrame(animate);

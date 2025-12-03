@@ -47,11 +47,16 @@ export const GAME_TEXT = {
     SCORE_LABEL: "점수",
     WAVE_LABEL: "웨이브",
     HP_LABEL: "HP",
-    CONTROLS: {
-      MOVE: "WASD - 이동",
-      FIRE: "LMB - 사격",
-      RELOAD: "R - 재장전",
-    },
+    // [NEW] 조작법 UI 제목
+    CONTROLS_LABEL: "조작법",
+    // [REFACTORED] 조작법을 배열 형태로 변경하여 쉽게 수정 및 추가할 수 있도록 함
+    CONTROLS: [
+      { action: "이동", keys: "W / A / S / D" },
+      { action: "사격", keys: "마우스 좌클릭" },
+      { action: "재장전", keys: "R" },
+      { action: "전력질주", keys: "Shift (누르기)" },
+      { action: "닷지", keys: "Space" },
+    ],
     // 캐릭터 이미지 로딩 중일 때
     LINKING: "연결 중...",
     // 재장전 바 텍스트

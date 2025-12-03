@@ -190,7 +190,7 @@ class SoundService {
     }
   }
 
-  public play(soundName: 'shoot' | 'impact' | 'footstep' | 'reload' | 'playerHit' | 'itemPickup' | 'uiSelect' | 'quickReloadSuccess' | 'quickReloadFail') {
+  public play(soundName: 'shoot' | 'impact' | 'footstep' | 'reload' | 'playerHit' | 'itemPickup' | 'uiSelect' | 'quickReloadSuccess' | 'quickReloadFail' | 'dodge' | 'dodgeLand' | 'sprintCollide') {
     // 컨텍스트가 없으면(초기화 안됨) 실행하지 않음
     if (!this.context) return;
     if (this.context.state === 'suspended') this.context.resume();
@@ -203,34 +203,18 @@ class SoundService {
 
     // 2. 파일이 없으면 합성음 재생 (신디사이저)
     switch (soundName) {
-      case 'shoot':
-        this.synthShoot();
-        break;
-      case 'impact':
-        this.synthImpact();
-        break;
-      case 'footstep':
-        this.synthFootstep();
-        break;
-      case 'reload':
-        this.synthReload();
-        break;
-      case 'playerHit':
-        this.synthPlayerHit();
-        break;
-      case 'itemPickup':
-        this.synthItemPickup();
-        break;
-      // [수정] 'uiSelect' 사운드 파일 로드 실패 시 재생될 합성음(synth)을 추가합니다.
-      case 'uiSelect':
-        this.synthUiSelect();
-        break;
-      case 'quickReloadSuccess': // 빠른 재장전 성공 시 합성음
-        this.synthQuickReloadSuccess();
-        break;
-      case 'quickReloadFail': // 빠른 재장전 실패 시 합성음
-        this.synthQuickReloadFail();
-        break;
+      case 'shoot': this.synthShoot(); break;
+      case 'impact': this.synthImpact(); break;
+      case 'footstep': this.synthFootstep(); break;
+      case 'reload': this.synthReload(); break;
+      case 'playerHit': this.synthPlayerHit(); break;
+      case 'itemPickup': this.synthItemPickup(); break;
+      case 'uiSelect': this.synthUiSelect(); break;
+      case 'quickReloadSuccess': this.synthQuickReloadSuccess(); break;
+      case 'quickReloadFail': this.synthQuickReloadFail(); break;
+      case 'dodge': this.synthDodge(); break;
+      case 'dodgeLand': this.synthDodgeLand(); break;
+      case 'sprintCollide': this.synthSprintCollide(); break;
     }
   }
 
@@ -252,6 +236,74 @@ class SoundService {
   }
 
   // --- 신디사이저 (합성음) 로직 ---
+
+  private synthDodge() {
+    if (!this.context) return;
+    const t = this.context.currentTime;
+    const vol = SOUND_SETTINGS.masterVolume * 0.5;
+    const bufferSize = this.context.sampleRate * 0.3;
+    const buffer = this.context.createBuffer(1, bufferSize, this.context.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    
+    const noise = this.context.createBufferSource();
+    noise.buffer = buffer;
+
+    const filter = this.context.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.Q.value = 5;
+    filter.frequency.setValueAtTime(800, t);
+    filter.frequency.exponentialRampToValueAtTime(3000, t + 0.2);
+
+    const gain = this.context.createGain();
+    gain.gain.setValueAtTime(vol, t);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.25);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.context.destination);
+    noise.start(t);
+  }
+
+  private synthDodgeLand() {
+    if (!this.context) return;
+    const t = this.context.currentTime;
+    const vol = SOUND_SETTINGS.masterVolume * 0.7;
+
+    const osc = this.context.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(200, t);
+    osc.frequency.exponentialRampToValueAtTime(50, t + 0.15);
+
+    const gain = this.context.createGain();
+    gain.gain.setValueAtTime(vol, t);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
+
+    osc.connect(gain);
+    gain.connect(this.context.destination);
+    osc.start(t);
+    osc.stop(t + 0.2);
+  }
+
+  private synthSprintCollide() {
+    if (!this.context) return;
+    const t = this.context.currentTime;
+    const vol = SOUND_SETTINGS.masterVolume * 0.6;
+    const osc = this.context.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(150, t);
+    osc.frequency.exponentialRampToValueAtTime(80, t + 0.1);
+
+    const gain = this.context.createGain();
+    gain.gain.setValueAtTime(vol, t);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+    
+    osc.connect(gain);
+    gain.connect(this.context.destination);
+    osc.start(t);
+    osc.stop(t + 0.15);
+  }
+
 
   // [NEW] 빠른 재장전 성공 시 재생되는 합성음
   private synthQuickReloadSuccess() {

@@ -86,7 +86,9 @@ const App: React.FC = () => {
     wave: 1,
     xp: 0,
     maxXp: 100,
-    level: 1
+    level: 1,
+    stamina: PLAYER_STATS.maxStamina,
+    maxStamina: PLAYER_STATS.maxStamina,
   });
   const [missionText, setMissionText] = useState<string>("Initializing secure link...");
   const [gameOverText, setGameOverText] = useState<string>("");
@@ -385,7 +387,7 @@ const App: React.FC = () => {
     setGameOverText(report);
   };
 
-  const handleUpdateStats = (newStats: { health: number; ammo: number; maxAmmo: number; score: number; wave: number; xp: number; maxXp: number; level: number }) => {
+  const handleUpdateStats = (newStats: { health: number; ammo: number; maxAmmo: number; score: number; wave: number; xp: number; maxXp: number; level: number; stamina: number; maxStamina: number; }) => {
     // GameCanvas로부터 업그레이드가 적용된 maxAmmo를 받아서 상태 업데이트
     setStats(newStats);
   };
@@ -810,7 +812,33 @@ export const GAME_OVER_UI_SETTINGS = {
       <>
         <div className="absolute inset-0 pointer-events-none py-1 px-4 flex flex-col justify-between z-20">
           <div className="flex justify-between items-start pt-2">
-            {/* 상단 좌측 HUD 제거됨 */}
+            {/* [MODIFIED] 조작법 UI (좌측 상단) - 배경 제거 및 크기 축소 */}
+            <div className="p-2 text-left">
+                <p 
+                  className="text-xs text-green-500 uppercase font-bold tracking-widest mb-1"
+                  style={{textShadow: '0 1px 3px rgba(0,0,0,0.8)'}}
+                >
+                  {GAME_TEXT.HUD.CONTROLS_LABEL}
+                </p>
+                <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
+                    {GAME_TEXT.HUD.CONTROLS.map((control, index) => (
+                        <React.Fragment key={index}>
+                            <span 
+                              className="text-gray-200 font-bold"
+                              style={{textShadow: '0 1px 3px rgba(0,0,0,0.8)'}}
+                            >
+                              {control.action}
+                            </span>
+                            <span 
+                              className="text-yellow-400 font-mono"
+                              style={{textShadow: '0 1px 3px rgba(0,0,0,0.8)'}}
+                            >
+                              {control.keys}
+                            </span>
+                        </React.Fragment>
+                    ))}
+                </div>
+            </div>
             
             <div className="bg-black/70 backdrop-blur-md p-4 rounded-lg text-right ml-auto">
               <p className="text-sm text-gray-400">{GAME_TEXT.HUD.SCORE_LABEL}</p>
@@ -900,11 +928,6 @@ export const GAME_OVER_UI_SETTINGS = {
                     </div>
                 </div>
             </div>
-            <div className="text-gray-500 text-xs text-right pb-4 pr-4 opacity-50 hidden md:block">
-                <div>{GAME_TEXT.HUD.CONTROLS.MOVE}</div>
-                <div>{GAME_TEXT.HUD.CONTROLS.FIRE}</div>
-                <div>{GAME_TEXT.HUD.CONTROLS.RELOAD}</div>
-            </div>
           </div>
         </div>
         
@@ -915,12 +938,12 @@ export const GAME_OVER_UI_SETTINGS = {
                 alt={GAME_TEXT.MENU.CHAR_NAME}
                 className="w-full h-full object-contain object-bottom"
             />
-            <div className="w-full h-4 bg-gray-900/80 border-2 border-gray-600/50 rounded-full p-0.5 relative flex justify-end">
+            <div className="w-full h-6 bg-gray-900/80 border-2 border-gray-600/50 rounded-full p-1 relative flex justify-end">
               <div 
                 className={`h-full transition-all duration-200 rounded-full ${stats.health > 30 ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`} 
                 style={{ width: `${Math.max(0, (stats.health / PLAYER_STATS.maxHealth) * 100)}%` }}>
               </div>
-              <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white drop-shadow-[0_1px_1px_rgba(0,0,0,1)]">
+              <div className="absolute inset-0 flex items-center justify-center text-base font-bold text-white drop-shadow-[0_1px_1px_rgba(0,0,0,1)]">
                 {Math.round(stats.health)} / {PLAYER_STATS.maxHealth}
               </div>
             </div>
@@ -1076,7 +1099,7 @@ export const GAME_OVER_UI_SETTINGS = {
                                       className={`relative w-48 p-2 bg-black/90 border-2 ${isMaxed ? 'border-yellow-500/50' : 'border-green-500/50'} hover:bg-green-900/40 hover:border-green-400 transition-all group-hover:scale-105 group-hover:shadow-[0_0_30px_rgba(34,197,94,0.4)] text-left disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden rounded-md`}
                                   >
                                       <div className="flex gap-3 items-center mb-2">
-                                          <div className={`w-14 h-14 shrink-0 border-2 relative ${isMaxed ? 'border-yellow-500/30 bg-yellow-900/10' : 'border-green-500/30 bg-green-900/20'} flex items-center justify-center rounded-md`}>
+                                          <div className={`w-14 h-14 shrink-0 border-2 relative ${isMaxed ? 'border-yellow-500/30 bg-yellow-900/10' : 'border-green-900/20'} flex items-center justify-center rounded-md`}>
                                               {!loadedUpgradeIcons[part] && <div className="w-8 h-8 border border-green-500/30 flex items-center justify-center"><div className="w-1 h-1 bg-green-500/50 rounded-full"></div></div>}
                                               <img src={info.ICON} alt={info.NAME} className={`absolute inset-0 w-full h-full object-contain p-1 transition-opacity duration-300 ${loadedUpgradeIcons[part] ? 'opacity-100' : 'opacity-0'}`} onLoad={() => setLoadedUpgradeIcons(prev => ({...prev, [part]: true}))}/>
                                           </div>
@@ -1281,7 +1304,7 @@ export const GAME_OVER_UI_SETTINGS = {
           <button 
             onClick={() => {
               setGameStatus(GameStatus.MENU);
-              setStats({ health: PLAYER_STATS.maxHealth, ammo: WEAPONS[selectedWeaponKey].maxAmmo, maxAmmo: WEAPONS[selectedWeaponKey].maxAmmo, score: 0, wave: 1, xp: 0, maxXp: 100, level: 1 });
+              setStats({ health: PLAYER_STATS.maxHealth, ammo: WEAPONS[selectedWeaponKey].maxAmmo, maxAmmo: WEAPONS[selectedWeaponKey].maxAmmo, score: 0, wave: 1, xp: 0, maxXp: 100, level: 1, stamina: PLAYER_STATS.maxStamina, maxStamina: PLAYER_STATS.maxStamina });
             }}
             className="w-full py-3 bg-red-700 hover:bg-red-600 text-white font-bold text-lg uppercase transition-all hover:shadow-[0_0_15px_rgba(220,38,38,0.5)]"
           >

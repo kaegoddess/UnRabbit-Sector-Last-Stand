@@ -58,6 +58,20 @@ export interface Player extends Entity {
   xp: number;
   maxXp: number;
   level: number;
+
+  // [NEW] 스테미나 시스템
+  stamina: number;
+  maxStamina: number;
+  isSprinting: boolean;
+  staminaRechargeDelayTimer: number;
+
+  // [NEW] 닷지 시스템
+  isDodging: boolean;
+  dodgeTimer: number;
+  dodgeDuration: number;
+  dodgeInvulnerabilityTimer: number;
+  dodgeDirection: Vector;
+  dodgeScale: number; // 닷지 시 캐릭터 크기 애니메이션용
   
   recoilOffset: number; 
   consecutiveShots: number; 
@@ -73,7 +87,7 @@ export interface Player extends Entity {
   activeTargetAngle: number; 
   aimQueue: { time: number; angle: number }[]; 
 
-  // [NEW] 빠른 재장전 시스템 관련 상태
+  // 빠른 재장전 시스템 관련 상태
   quickReloadSweetSpot: number; // 재장전 게이지 0.0 ~ 1.0 사이의 빠른 재장전 성공 '지점' (화살표 위치)
   quickReloadHitWindowStart: number; // 초록색 성공 범위 시작 (0.0 ~ 1.0)
   quickReloadHitWindowEnd: number; // 초록색 성공 범위 끝 (0.0 ~ 1.0)
@@ -92,6 +106,12 @@ export interface Zombie extends Entity {
   slowTimer: number; 
   slowFactor: number; 
   xp: number; // 처치 시 획득 경험치
+
+  // [NEW] 부드러운 넉백 효과를 위한 상태 변수
+  // 넉백 시 적용될 속도 벡터입니다. {x, y} 형태로 저장됩니다.
+  knockbackVelocity: Vector; 
+  // 넉백 효과가 지속될 남은 시간 (초) 입니다.
+  knockbackTimer: number;
 }
 
 export interface Bullet extends Entity {
@@ -166,4 +186,6 @@ export interface GameStats {
   level: number;
   xp: number;
   maxXp: number;
+  stamina: number;
+  maxStamina: number;
 }

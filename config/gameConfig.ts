@@ -3,7 +3,7 @@
 
 // [NEW] 게임 버전 관리
 // 이 값은 제가 코드를 수정할 때마다 자동으로 0.01씩 증가합니다.
-export const GAME_VERSION = "0.40";
+export const GAME_VERSION = "0.43";
 
 // 거리 단위: 픽셀(px)
 // 시간 단위: 밀리초(ms) 또는 초(s)
@@ -13,6 +13,11 @@ export const SOUND_SETTINGS = {
   masterVolume: 3,
   footstepInterval: 350, // 발소리 간격 (ms) - 걷는 리듬에 맞춰 조정
   
+  // [NEW] 전력질주 충돌음 재생 최소 간격 (ms)
+  // 이 시간 내에는 충돌음이 한 번만 재생되어 사운드 왜곡을 방지합니다.
+  // 예: 200ms로 설정하면, 0.2초 안에 여러 마리와 부딪쳐도 소리는 한 번만 납니다.
+  sprintCollideCooldown: 200,
+
   // 프로젝트 빌드 시 포함할 사운드 파일 경로를 지정합니다.
   // 이 파일들은 프로젝트의 public/sound 폴더 안에 있어야 합니다.
   // 파일이 없으면 자동으로 내장 신디사이저(합성음)가 작동합니다.
@@ -24,9 +29,13 @@ export const SOUND_SETTINGS = {
     playerHit: 'sound/player_hit.mp3',
     itemPickup: 'sound/pickup.mp3', // 아이템 획득 사운드 파일 경로
     uiSelect: 'sound/ui_select.mp3', // UI 선택 효과음. 파일이 없으므로 합성음이 재생됩니다.
-    // [NEW] 빠른 재장전 사운드
+    // 빠른 재장전 사운드
     quickReloadSuccess: 'sound/quick_reload_success.mp3', 
     quickReloadFail: 'sound/quick_reload_fail.mp3',
+    // [NEW] 닷지 및 전력질주 사운드
+    dodge: 'sound/dodge.mp3',
+    dodgeLand: 'sound/dodge_land.mp3',
+    sprintCollide: 'sound/sprint_collide.mp3',
   }
 };
 
@@ -49,7 +58,7 @@ export const GAME_SETTINGS = {
   particleLifeDecay: 2.0, // 초당 투명도 감소량 (2.0이면 0.5초 지속)
   scoreToNextWave: 10, 
 
-  // [NEW] 빠른 재장전 시스템 설정
+  // 빠른 재장전 시스템 설정
   quickReloadInputMinProgress: 0.3, // 재장전 진행도 30% 전까지는 빠른 재장전 입력 무시
   quickReloadShakeDuration: 0.3, // 빠른 재장전 실패 시 재장전 바 흔들림 지속 시간 (초)
   quickReloadPostSuccessCooldown: 0.17, // 빠른 재장전 성공 후 총알 발사 방지 쿨다운 (초)
@@ -69,17 +78,17 @@ export const RENDER_SETTINGS = {
   // 그림자가 더 잘 보이게 합니다. 0.8로 설정하면 더 작아집니다.
   shadowScale: 1.3,
   
-  // [NEW] 시각적 반동 회복 속도 (px/s).
+  // 시각적 반동 회복 속도 (px/s).
   // 이 수치가 높을수록 총몸이 원래 위치로 더 빨리 복귀합니다.
   // 명중률 회복('recoilRecovery')과 분리되어 시각적 느낌만 제어합니다.
   visualRecoilRecoverySpeed: 500,
 
-  // [NEW] 최대 시각적 반동 거리 (px).
+  // 최대 시각적 반동 거리 (px).
   // 아무리 연사해도 총몸이 이 값 이상으로 밀려나지 않습니다.
   // 라이플 등이 화면 밖으로 밀려나는 버그를 방지합니다.
   maxVisualRecoil: 40,
 
-  // [NEW] 재장전 UI 스케일 설정
+  // 재장전 UI 스케일 설정
   reloadUIScale: 1.5, // 재장전 UI 전체 크기 배율 (1.0 = 100%)
   reloadUIBaseWidth: 40, // 재장전 바의 기본 너비 (px)
   reloadUIBaseHeight: 6, // 재장전 바의 기본 높이 (px)
