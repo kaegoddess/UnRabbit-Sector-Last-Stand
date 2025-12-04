@@ -95,6 +95,7 @@ export interface Player extends Entity {
   quickReloadShakeTimer: number; // 빠른 재장전 실패 시 흔들림 효과 타이머
   isQuickReloadAttempted: boolean; // 현재 재장전 주기 동안 빠른 재장전을 시도했는지 여부 (한 번만 적용)
   quickReloadCooldownTimer: number; // 빠른 재장전 성공 후 발사 방지 쿨다운 타이머
+  isQuickReloadFailed: boolean; // [NEW] 빠른 재장전 실패로 인한 입력 잠금 상태 (탄피형 재장전용)
 }
 
 export interface Zombie extends Entity {

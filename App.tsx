@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import GameCanvas from './components/GameCanvas';
 import { GameStatus, WeaponPart, UpgradeState } from './types';
@@ -98,6 +99,9 @@ const App: React.FC = () => {
   // 무기 업그레이드 3D 틸트 효과를 위한 상태
   const [hoveredPart, setHoveredPart] = useState<WeaponPart | null>(null);
 
+  // [NEW] 탄약 부족 경고 효과를 위한 상태
+  const [isAmmoWarning, setIsAmmoWarning] = useState(false);
+
   // --- 개발자 모드 ---
   const [isUpgradeDevMode, setIsUpgradeDevMode] = useState(false);
   const [devUpgradePositions, setDevUpgradePositions] = useState(WEAPONS[selectedWeaponKey].upgradePositions);
@@ -126,10 +130,18 @@ const App: React.FC = () => {
   const requestRef = useRef<number>(0);
   const prevTimeRef = useRef<number>(0);
   
-  // 탄약 UI를 실제 탄피처럼 보이게 하는 컴포넌트
-  const BulletUI = ({ isLoaded }: { isLoaded: boolean }) => {
+  // [MODIFIED] 탄약 부족 시 붉은색으로 깜빡이는 효과 추가
+  const BulletUI = ({ isLoaded, width = 10, height = 24 }: { isLoaded: boolean, width?: number, height?: number }) => {
+    // 경고 상태일 때 붉은색(bg-red-600), 아니면 기존 로직 (노란색/회색)
+    const bgColor = isAmmoWarning 
+        ? 'bg-red-600 shadow-[0_0_8px_rgba(220,38,38,0.8)]' 
+        : (isLoaded ? 'bg-yellow-500 shadow-[0_0_8px_rgba(250,204,21,0.6)]' : 'bg-gray-800');
+
     return (
-      <div className={`relative w-2.5 h-6 rounded-sm transition-colors duration-200 ${isLoaded ? 'bg-yellow-500 shadow-[0_0_8px_rgba(250,204,21,0.6)]' : 'bg-gray-800'}`}>
+      <div 
+        className={`relative rounded-sm transition-colors duration-200 ${bgColor}`}
+        style={{ width: `${width}px`, height: `${height}px` }}
+      >
         {/* 광택(Highlight) 효과 */}
         <div className="absolute inset-0 rounded-sm border-t border-l border-white/30"></div>
         {/* 그림자(Shadow) 효과 */}
@@ -383,6 +395,8 @@ const App: React.FC = () => {
       if (firedAmmoIndex < 1) return;
 
       const config = WEAPONS[selectedWeaponKey].uiCasingPhysics;
+      // [FIX] WEAPONS는 flat 구조이므로 .visuals를 제거하고 직접 ammoUi에 접근합니다.
+      const ammoConfig = WEAPONS[selectedWeaponKey].ammoUi; 
       let rect: { left: number; top: number; width: number; height: number } | null = null;
       
       const el = document.getElementById(`bullet-${firedAmmoIndex}`);
@@ -390,27 +404,35 @@ const App: React.FC = () => {
       if (el) {
         rect = el.getBoundingClientRect();
       } else {
+        // 요소가 없을 경우 예상 위치 계산 (폴백)
         const container = document.getElementById('ammo-container');
         if (container) {
             const containerRect = container.getBoundingClientRect();
             
-            // Layout Logic (renderGameUI와 동일한 로직) - 직사각형 탄피 UI
-            const bulletWidth = 10; // w-2.5 = 10px
-            const bulletHeight = 24; // h-6 = 24px
-            const gap = 4; // gap-1 = 4px
-            const bottomRowMarginLeft = 10; // ml-2.5
-
-            const isTopRow = firedAmmoIndex % 2 !== 0;
-            const colIndex = Math.floor((firedAmmoIndex - 1) / 2);
+            const bW = ammoConfig.bulletWidth;
+            const bH = ammoConfig.bulletHeight;
+            const gap = ammoConfig.gap;
             
-            const offsetX = colIndex * (bulletWidth + gap) + (isTopRow ? 0 : bottomRowMarginLeft);
-            const offsetY = isTopRow ? 0 : (bulletHeight + gap);
+            let offsetX = 0;
+            let offsetY = 0;
+
+            if (ammoConfig.layout === 'double') {
+                const isTopRow = firedAmmoIndex % 2 !== 0;
+                const colIndex = Math.floor((firedAmmoIndex - 1) / 2);
+                offsetX = colIndex * (bW + gap) + (isTopRow ? 0 : 10); // 10은 2열 오프셋
+                offsetY = isTopRow ? 0 : (bH + gap);
+            } else {
+                // Single layout
+                const index = firedAmmoIndex - 1; // 0-based
+                offsetX = index * (bW + gap);
+                offsetY = 0;
+            }
 
             rect = {
                 left: containerRect.left + offsetX,
                 top: containerRect.top + offsetY,
-                width: bulletWidth,
-                height: bulletHeight
+                width: bW,
+                height: bH
             };
         }
       }
@@ -432,6 +454,15 @@ const App: React.FC = () => {
         });
       }
   }, [selectedWeaponKey]);
+
+  // [NEW] 빈 총 발사 시 UI 효과 트리거 함수
+  const handleDryFire = useCallback(() => {
+      setIsAmmoWarning(true);
+      // 200ms 후에 경고 효과 해제 (짧은 깜빡임)
+      setTimeout(() => {
+          setIsAmmoWarning(false);
+      }, 200);
+  }, []);
 
   const handleUpgrade = (part: WeaponPart) => {
     setUpgradeLevels(prev => ({
@@ -749,13 +780,18 @@ export const GAME_OVER_UI_SETTINGS = {
       }
   }
 
-  // --- 탄약 UI 렌더링을 위한 계산 ---
+  // --- 탄약 UI 렌더링을 위한 계산 및 설정 ---
+  // [FIX] WEAPONS는 flat 구조이므로 .visuals를 제거하고 직접 ammoUi에 접근합니다.
+  const currentAmmoUiConfig = WEAPONS[selectedWeaponKey].ammoUi;
+  
+  // 기본값 설정 (설정 파일에 없을 경우를 대비)
+  const ammoUiLayout = currentAmmoUiConfig?.layout || 'single';
+  const bulletW = currentAmmoUiConfig?.bulletWidth || 10;
+  const bulletH = currentAmmoUiConfig?.bulletHeight || 24;
+  const gap = currentAmmoUiConfig?.gap || 4;
+
   const totalBullets = stats.maxAmmo;
   const currentAmmo = stats.ammo;
-  const bulletsInFirstRow = Math.ceil(totalBullets / 2);
-  const bulletsInSecondRow = Math.floor(totalBullets / 2);
-  const bulletsLeftInTopRow = Math.ceil(currentAmmo / 2);
-  const bulletsLeftInBottomRow = Math.floor(currentAmmo / 2);
 
   // 현재 무기의 HUD 아이콘 스케일 값을 설정 파일에서 가져옵니다.
   const hudIconScale = WEAPONS[selectedWeaponKey].hudIconScale || 1;
@@ -770,6 +806,7 @@ export const GAME_OVER_UI_SETTINGS = {
       onUpdateStats={handleUpdateStats}
       onGameOver={handleGameOver}
       onShoot={handleShoot}
+      onDryFire={handleDryFire} // [NEW] 콜백 전달
       isPaused={isHudDevMode || gameStatus === GameStatus.LEVEL_UP || gameStatus === GameStatus.GAME_OVER || gameStatus === GameStatus.MENU}
     />
 
@@ -885,31 +922,63 @@ export const GAME_OVER_UI_SETTINGS = {
                         </div>
                       </div>
 
-                      {/* [수정] 탄약 UI의 상단 여백(mt-1)을 제거합니다. */}
-                      <div id="ammo-container" className="flex flex-col gap-1 h-auto">
-                            {/* Top Row (홀수 번호 총알: 1, 3, 5...) */}
-                            <div className="flex gap-1 h-6">
-                                {Array.from({ length: bulletsInFirstRow }).map((_, i) => {
-                                    const bulletId = (i * 2) + 1;
-                                    return (
-                                      <div key={`top-${i}`} id={`bullet-${bulletId}`}>
-                                        <BulletUI isLoaded={i < bulletsLeftInTopRow} />
-                                      </div>
-                                    );
-                                })}
-                            </div>
-                            {/* Bottom Row (짝수 번호 총알: 2, 4, 6...) */}
-                            {bulletsInSecondRow > 0 && (
-                              <div className="flex gap-1 h-6 ml-2.5">
-                                  {Array.from({ length: bulletsInSecondRow }).map((_, i) => {
-                                      const bulletId = (i * 2) + 2;
-                                      return (
-                                        <div key={`bottom-${i}`} id={`bullet-${bulletId}`}>
-                                          <BulletUI isLoaded={i < bulletsLeftInBottomRow} />
-                                        </div>
-                                      );
-                                  })}
-                              </div>
+                      {/* [MODIFIED] 동적 탄약 UI 렌더링. 경고 상태일 경우 흔들림 애니메이션 적용 */}
+                      <div 
+                        id="ammo-container" 
+                        className={`flex flex-col gap-1 h-auto mt-1 ${isAmmoWarning ? 'animate-shake-x' : ''}`} 
+                        style={{ gap: `${gap}px` }}
+                      >
+                            {ammoUiLayout === 'single' ? (
+                                /* 1열 배치 (Single Column) */
+                                <div className="flex" style={{ gap: `${gap}px` }}>
+                                    {Array.from({ length: totalBullets }).map((_, i) => {
+                                        const bulletId = i + 1; // 1-based index for single row
+                                        return (
+                                            <div key={`bullet-${i}`} id={`bullet-${bulletId}`}>
+                                                <BulletUI isLoaded={i < currentAmmo} width={bulletW} height={bulletH} />
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                /* 2열 배치 (Double Column - Zigzag) */
+                                <>
+                                    {(() => {
+                                        const bulletsInFirstRow = Math.ceil(totalBullets / 2);
+                                        const bulletsInSecondRow = Math.floor(totalBullets / 2);
+                                        const bulletsLeftInTopRow = Math.ceil(currentAmmo / 2);
+                                        const bulletsLeftInBottomRow = Math.floor(currentAmmo / 2);
+
+                                        return (
+                                            <>
+                                                {/* Top Row (홀수 번호 총알: 1, 3, 5...) */}
+                                                <div className="flex" style={{ gap: `${gap}px` }}>
+                                                    {Array.from({ length: bulletsInFirstRow }).map((_, i) => {
+                                                        const bulletId = (i * 2) + 1;
+                                                        return (
+                                                          <div key={`top-${i}`} id={`bullet-${bulletId}`}>
+                                                            <BulletUI isLoaded={i < bulletsLeftInTopRow} width={bulletW} height={bulletH} />
+                                                          </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                                {/* Bottom Row (짝수 번호 총알: 2, 4, 6...) */}
+                                                {bulletsInSecondRow > 0 && (
+                                                  <div className="flex ml-2.5" style={{ gap: `${gap}px` }}>
+                                                      {Array.from({ length: bulletsInSecondRow }).map((_, i) => {
+                                                          const bulletId = (i * 2) + 2;
+                                                          return (
+                                                            <div key={`bottom-${i}`} id={`bullet-${bulletId}`}>
+                                                              <BulletUI isLoaded={i < bulletsLeftInBottomRow} width={bulletW} height={bulletH} />
+                                                            </div>
+                                                          );
+                                                      })}
+                                                  </div>
+                                                )}
+                                            </>
+                                        );
+                                    })()}
+                                </>
                             )}
                         </div>
                     </div>
@@ -1207,23 +1276,19 @@ export const GAME_OVER_UI_SETTINGS = {
                                   
                                   {/* [수정] 콘텐츠 컨테이너에 `items-start`를 추가하여 상단 정렬을 강제합니다. */}
                                   <div className="relative z-10 flex flex-col w-full h-full p-2 bg-gray-900 gap-1 items-start">
-                                      {/* [유지] 텍스트가 흔들리지 않도록 고정 높이, 줄바꿈 방지 등의 클래스를 유지합니다. */}
                                       <div className="h-5 text-sm font-bold text-gray-300 w-full text-left flex-shrink-0 leading-none whitespace-nowrap overflow-hidden text-ellipsis transform-gpu">{weapon.name}</div>
-                                      
-                                      {/* [수정] 무기 아이콘 컨테이너의 높이를 `h-28`로 고정합니다. */}
                                       <div className="relative w-full h-28 flex items-center justify-center overflow-hidden">
                                           <FallbackImage 
-                                              srcs={assetInfo.weapon} 
-                                              alt={weapon.name} 
-                                              className={`w-full h-full object-contain drop-shadow-lg transition-opacity duration-300 ${assetInfo.weaponLoaded ? 'opacity-100' : 'opacity-0'}`}
-                                              style={{ transform: `scale(${weapon.menuIconScale || 1})` }}
-                                              onLoad={() => assetInfo.setWeaponLoaded(true)}
+                                            srcs={assetInfo.weapon} 
+                                            alt={weapon.name} 
+                                            className={`w-full h-full object-contain drop-shadow-lg transition-opacity duration-300 ${assetInfo.weaponLoaded ? 'opacity-100' : 'opacity-0'}`} 
+                                            style={{ transform: `scale(${weapon.menuIconScale || 1})` }} 
+                                            onLoad={() => assetInfo.setWeaponLoaded(true)}
                                           />
                                       </div>
-                                      
                                       <div className="w-full space-y-1 flex-shrink-0 mt-auto">
                                           <StatBar label="DMG" value={weapon.damage * (weapon.pelletCount || 1)} max={80} color="bg-red-500" />
-                                          <StatBar label="RATE" value={weapon.fireRate} max={900} color="bg-yellow-500" invert />
+                                          <StatBar label="RATE" value={weapon.fireRate} max={900} color="bg-yellow-500" invert={true} />
                                           <StatBar label="MAG" value={weapon.maxAmmo} max={30} color="bg-blue-500" />
                                           <StatBar label="PEN" value={weapon.penetration.count} max={5} color="bg-purple-500" />
                                       </div>
@@ -1231,10 +1296,12 @@ export const GAME_OVER_UI_SETTINGS = {
                               </div>
                           );
                       })}
-                      
                   </div>
               </div>
-              <button onClick={handleStartGame} className="w-full py-5 bg-green-700 hover:bg-green-600 text-white font-bold text-2xl tracking-widest uppercase transition-all hover:scale-[1.01] hover:shadow-[0_0_20px_rgba(34,197,94,0.5)] border border-green-500">{GAME_TEXT.MENU.DEPLOY_BUTTON}</button>
+              
+              <button onClick={handleStartGame} className="w-full py-5 bg-green-700 hover:bg-green-600 text-white font-bold text-2xl tracking-widest uppercase transition-all hover:scale-[1.01] hover:shadow-[0_0_20px_rgba(34,197,94,0.5)] border border-green-500">
+                  {GAME_TEXT.MENU.DEPLOY_BUTTON}
+              </button>
             </div>
           </div>
       </div>
@@ -1243,7 +1310,7 @@ export const GAME_OVER_UI_SETTINGS = {
     {gameStatus === GameStatus.GAME_OVER && finalReport && (
       <div className="absolute inset-0 z-30 flex items-center justify-center bg-red-900/40 backdrop-blur-md">
         
-        {/* 게임오버 UI 개발자 모드 */}
+        {/* Game Over UI Dev Mode */}
         {isGameOverDevMode && (
           <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[100] bg-yellow-500 text-black p-2 rounded shadow-lg flex items-center gap-4 font-sans pointer-events-auto">
             <p className="font-bold text-sm uppercase">Game Over UI Dev Mode</p>
@@ -1260,48 +1327,63 @@ export const GAME_OVER_UI_SETTINGS = {
             </button>
           </div>
         )}
-        
+
         <div className="relative max-w-md w-full p-8 bg-gray-900 border-2 border-red-800 shadow-[0_0_50px_rgba(220,38,38,0.3)] rounded-lg text-center">
-          <FallbackImage
-              srcs={ASSETS.CHAR_SAD}
-              alt="Mission Failed"
-              className="absolute z-0 pointer-events-none drop-shadow-[0_0_20px_rgba(0,0,0,0.8)]"
-              style={gameOverImageStyle}
-          />
-          <h2 className="text-5xl font-black text-red-500 mb-2 tracking-widest">{GAME_TEXT.GAME_OVER.TITLE}</h2>
-          <div className="h-1 w-24 bg-red-600 mx-auto mb-6"></div>
-          <div className="grid grid-cols-2 gap-4 mb-6 text-left">
-            <div className="bg-gray-800 p-3 rounded border border-gray-700">
-              <p className="text-gray-500 text-xs uppercase">{GAME_TEXT.GAME_OVER.SCORE}</p>
-              <p className="text-2xl text-white font-bold">{finalReport.score}</p>
+            <FallbackImage
+                srcs={ASSETS.CHAR_SAD}
+                alt="Mission Failed"
+                className="absolute z-0 pointer-events-none drop-shadow-[0_0_20px_rgba(0,0,0,0.8)]"
+                style={gameOverImageStyle}
+            />
+            <h2 className="text-5xl font-black text-red-500 mb-2 tracking-widest">{GAME_TEXT.GAME_OVER.TITLE}</h2>
+            <div className="h-1 w-24 bg-red-600 mx-auto mb-6"></div>
+            
+            <div className="grid grid-cols-2 gap-4 mb-6 text-left">
+                <div className="bg-gray-800 p-3 rounded border border-gray-700">
+                    <p className="text-gray-500 text-xs uppercase">{GAME_TEXT.GAME_OVER.SCORE}</p>
+                    <p className="text-2xl text-white font-bold">{finalReport.score}</p>
+                </div>
+                <div className="bg-gray-800 p-3 rounded border border-gray-700">
+                    <p className="text-gray-500 text-xs uppercase">{GAME_TEXT.GAME_OVER.WAVES}</p>
+                    <p className="text-2xl text-white font-bold">{finalReport.wave}</p>
+                </div>
+                <div className="bg-gray-800 p-3 rounded border border-gray-700 col-span-2">
+                    <p className="text-gray-500 text-xs uppercase">{GAME_TEXT.GAME_OVER.KILLS}</p>
+                    <p className="text-2xl text-white font-bold">{finalReport.kills}</p>
+                </div>
             </div>
-            <div className="bg-gray-800 p-3 rounded border border-gray-700">
-              <p className="text-gray-500 text-xs uppercase">{GAME_TEXT.GAME_OVER.WAVES}</p>
-              <p className="text-2xl text-white font-bold">{finalReport.wave}</p>
+            
+            <div className="bg-black p-4 border border-red-900 mb-8 text-red-400 text-sm text-left">
+                <p className="mb-2 text-xs uppercase text-red-700">{GAME_TEXT.GAME_OVER.HQ_ANALYSIS}</p>
+                <p className="font-body">{gameOverText || GAME_TEXT.GAME_OVER.CONNECTION_LOST}</p>
             </div>
-            <div className="bg-gray-800 p-3 rounded border border-gray-700 col-span-2">
-              <p className="text-gray-500 text-xs uppercase">{GAME_TEXT.GAME_OVER.KILLS}</p>
-              <p className="text-2xl text-white font-bold">{finalReport.kills}</p>
-            </div>
-          </div>
-          <div className="bg-black p-4 border border-red-900 mb-8 text-red-400 text-sm text-left">
-            <p className="mb-2 text-xs uppercase text-red-700">{GAME_TEXT.GAME_OVER.HQ_ANALYSIS}</p>
-            <p className="font-body">{gameOverText || GAME_TEXT.GAME_OVER.CONNECTION_LOST}</p>
-          </div>
-          <button 
-            onClick={() => {
-              setGameStatus(GameStatus.MENU);
-              setStats({ health: PLAYER_STATS.maxHealth, ammo: WEAPONS[selectedWeaponKey].maxAmmo, maxAmmo: WEAPONS[selectedWeaponKey].maxAmmo, score: 0, wave: 1, xp: 0, maxXp: 100, level: 1, stamina: PLAYER_STATS.maxStamina, maxStamina: PLAYER_STATS.maxStamina });
-            }}
-            className="w-full py-3 bg-red-700 hover:bg-red-600 text-white font-bold text-lg uppercase transition-all hover:shadow-[0_0_15px_rgba(220,38,38,0.5)]"
-          >
-            {GAME_TEXT.GAME_OVER.RETRY_BUTTON}
-          </button>
+            
+            <button 
+                onClick={() => {
+                  setGameStatus(GameStatus.MENU);
+                  // Stats reset
+                  setStats({ 
+                    health: PLAYER_STATS.maxHealth, 
+                    ammo: WEAPONS[selectedWeaponKey].maxAmmo, 
+                    maxAmmo: WEAPONS[selectedWeaponKey].maxAmmo, 
+                    score: 0, 
+                    wave: 1, 
+                    xp: 0, 
+                    maxXp: 100, 
+                    level: 1,
+                    stamina: PLAYER_STATS.maxStamina, // [FIX] 누락된 stamina 속성 추가
+                    maxStamina: PLAYER_STATS.maxStamina // [FIX] 누락된 maxStamina 속성 추가
+                  });
+                }}
+                className="w-full py-3 bg-red-700 hover:bg-red-600 text-white font-bold text-lg uppercase transition-all hover:shadow-[0_0_15px_rgba(220,38,38,0.5)]"
+            >
+                {GAME_TEXT.GAME_OVER.RETRY_BUTTON}
+            </button>
         </div>
       </div>
     )}
   </div>
-);
+  );
 };
 
 export default App;

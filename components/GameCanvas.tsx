@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useCallback } from 'react';
 import { Player, Zombie, Bullet, Particle, Shell, FloatingText, GameStatus, WeaponPart, UpgradeState, Item, ItemType, GameStats } from '../types';
 import { GAME_SETTINGS, SOUND_SETTINGS, FLOATING_TEXT, RENDER_SETTINGS } from '../config/gameConfig';
@@ -17,10 +18,11 @@ interface GameCanvasProps {
   onUpdateStats: (stats: { health: number; ammo: number; maxAmmo: number; score: number; wave: number; xp: number; maxXp: number; level: number; stamina: number; maxStamina: number; }) => void;
   onGameOver: (finalScore: number, kills: number, wave: number) => void;
   onShoot: (firedAmmoIndex: number) => void; // 발사 이벤트 콜백 (UI 탄피 연출용)
+  onDryFire?: () => void; // [NEW] 탄약 부족 시 사격 시도 이벤트 (UI 흔들림용)
   isPaused: boolean; // 게임 일시정지 상태 (개발자 모드 또는 레벨업)
 }
 
-const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, upgradeLevels, setGameStatus, onUpdateStats, onGameOver, onShoot, isPaused }) => {
+const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, upgradeLevels, setGameStatus, onUpdateStats, onGameOver, onShoot, onDryFire, isPaused }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const backgroundCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -29,9 +31,15 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
   
   // onShoot prop을 최신 상태로 유지하기 위한 Ref (Stale Closure 방지)
   const onShootRef = useRef(onShoot);
+  const onDryFireRef = useRef(onDryFire);
+
   useEffect(() => {
     onShootRef.current = onShoot;
   }, [onShoot]);
+
+  useEffect(() => {
+    onDryFireRef.current = onDryFire;
+  }, [onDryFire]);
   
   const currentWeapon = WEAPONS[selectedWeaponId as keyof typeof WEAPONS] || WEAPONS.Pistol;
   
@@ -92,6 +100,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
     quickReloadShakeTimer: 0,
     isQuickReloadAttempted: false,
     quickReloadCooldownTimer: 0, // 빠른 재장전 성공 후 발사 방지 쿨다운 타이머
+    isQuickReloadFailed: false, // [NEW] 빠른 재장전 실패 락 초기화
   });
 
   const zombiesRef = useRef<Zombie[]>([]);
@@ -415,6 +424,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
       quickReloadShakeTimer: 0,
       isQuickReloadAttempted: false,
       quickReloadCooldownTimer: 0, // 빠른 재장전 성공 후 발사 방지 쿨다운 타이머 초기화
+      isQuickReloadFailed: false, // [NEW] 빠른 재장전 실패 락 초기화
     };
     zombiesRef.current = [];
     bulletsRef.current = [];
@@ -517,10 +527,15 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
 
   const reload = () => {
     const player = playerRef.current;
-    if (player.isReloading || player.ammo === player.maxAmmo || player.isDodging) return;
+    // [NEW] isQuickReloadFailed 상태면 재장전 시도 불가 (락이 풀릴 때까지 대기)
+    if (player.isReloading || player.ammo === player.maxAmmo || player.isDodging || player.isQuickReloadFailed) return;
     
     player.isReloading = true;
-    soundService.play('reload');
+    // [MODIFIED] 재장전 시작 시 사운드를 재생합니다. 'shell' 타입은 루프에서 별도 사운드 처리.
+    // 'magazine' 타입만 여기서 사운드를 재생합니다.
+    if (currentWeapon.reloadType !== 'shell') {
+        soundService.play('reload');
+    }
     
     const actualReloadTimeMs = currentWeapon.reloadTime / player.reloadAbility;
     player.totalReloadTime = actualReloadTimeMs / 1000; // 초 단위
@@ -528,8 +543,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
     player.isQuickReloadAttempted = false; // 새로운 재장전 시작 시 초기화
     player.quickReloadShakeTimer = 0; // 흔들림 타이머 초기화
     player.quickReloadCooldownTimer = 0; // 빠른 재장전 쿨다운 타이머 초기화
+    player.isQuickReloadFailed = false; // [NEW] 초기화
 
     // [NEW] 빠른 재장전 타이밍 및 성공 범위 계산
+    // Shell 타입일 경우 빠른 재장전 로직이 복잡해질 수 있으므로, 일단 동일하게 적용하지만
+    // UI 표시나 입력 처리는 update()에서 제어할 수 있습니다.
     const minTime = currentWeapon.quickReloadMinTimePercent;
     const maxTime = currentWeapon.quickReloadMaxTimePercent;
     const difficulty = currentWeapon.quickReloadDifficultyPercent;
@@ -540,10 +558,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
     // 성공 범위 계산 (스윗스팟 중앙으로)
     player.quickReloadHitWindowStart = Math.max(0, player.quickReloadSweetSpot - difficulty / 2);
     player.quickReloadHitWindowEnd = Math.min(1, player.quickReloadSweetSpot + difficulty / 2);
-
-    // [FIX] 재장전 시 반동을 즉시 초기화하는 대신,
-    // update()의 자연스러운 회복 로직에 맡겨 조준원이 부드럽게 줄어들도록 합니다.
-    // playerRef.current.consecutiveShots = 0;
   };
 
   const createFloatingText = (x: number, y: number, text: string, isCritical: boolean, customColor?: string) => {
@@ -577,6 +591,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
     const player = playerRef.current;
     if (player.isDodging) return; // [NEW] 닷지 중에는 발사 불가
     
+    // [NEW] 빠른 재장전 실패로 락이 걸린 상태면 입력 무시
+    if (player.isQuickReloadFailed) return;
+
     const effectiveStats = calculateWeaponStats(player.level);
     const now = Date.now();
 
@@ -585,36 +602,96 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
 
     // [NEW] 빠른 재장전 입력 감지 로직
     if (player.isReloading) {
-        // 최소 진행도 이전에는 빠른 재장전 시도를 체크하지 않음
         const reloadProgress = player.reloadTimer / player.totalReloadTime;
-        if (reloadProgress < GAME_SETTINGS.quickReloadInputMinProgress) return; 
+        const isQuickReloadWindow = reloadProgress >= GAME_SETTINGS.quickReloadInputMinProgress;
 
-        // 한 번의 재장전 주기 동안 빠른 재장전 시도는 한 번만
-        if (player.isQuickReloadAttempted) return; 
-        
-        player.isQuickReloadAttempted = true; // 시도 플래그 설정
+        // 1. 빠른 재장전 입력 범위이고, 아직 시도하지 않았다면 빠른 재장전 시도로 처리
+        if (isQuickReloadWindow && !player.isQuickReloadAttempted) {
+            player.isQuickReloadAttempted = true; // 시도 플래그 설정
 
-        // 현재 재장전 진행도가 성공 범위 내에 있는지 확인
-        if (reloadProgress >= player.quickReloadHitWindowStart && reloadProgress <= player.quickReloadHitWindowEnd) {
-            // 빠른 재장전 성공!
-            player.ammo = player.maxAmmo; // 즉시 탄약 채움
-            player.isReloading = false; // 재장전 상태 종료
-            soundService.play('quickReloadSuccess');
-            createFloatingText(player.x, player.y - 60, GAME_TEXT.HUD.QUICK_RELOAD_SUCCESS, false, '#22c55e'); // 초록색 텍스트
-            player.quickReloadShakeTimer = 0; // 혹시 모를 흔들림 초기화
-            player.quickReloadCooldownTimer = GAME_SETTINGS.quickReloadPostSuccessCooldown; // 성공 시 쿨다운 시작
-        } else {
-            // 빠른 재장전 실패!
-            soundService.play('quickReloadFail');
-            player.quickReloadShakeTimer = GAME_SETTINGS.quickReloadShakeDuration; // 흔들림 타이머 시작
-            createFloatingText(player.x, player.y - 60, GAME_TEXT.HUD.QUICK_RELOAD_FAIL, false, '#ef4444'); // 빨간색 텍스트
-            // 실패해도 일반 재장전은 계속 진행됩니다.
+            // 현재 재장전 진행도가 성공 범위 내에 있는지 확인
+            if (reloadProgress >= player.quickReloadHitWindowStart && reloadProgress <= player.quickReloadHitWindowEnd) {
+                // 빠른 재장전 성공!
+                soundService.play('quickReloadSuccess');
+                
+                let successText = GAME_TEXT.HUD.QUICK_RELOAD_SUCCESS;
+                const bonusAmmo = 2; // 탄피형 재장전 보너스 (변수로 분리)
+
+                player.quickReloadShakeTimer = 0; // 혹시 모를 흔들림 초기화
+                // [IMPORTANT] 성공 시 사격 쿨다운 적용하여 의도치 않은 발사 방지
+                player.quickReloadCooldownTimer = GAME_SETTINGS.quickReloadPostSuccessCooldown; 
+
+                if (currentWeapon.reloadType === 'shell') {
+                    // [NEW] 샷건: 탄약을 2발 채움 (최대치 초과 방지)
+                    successText += ` +${bonusAmmo}`; // 텍스트에 실제 증가량 표시
+                    player.ammo = Math.min(player.maxAmmo, player.ammo + bonusAmmo);
+                    
+                    if (player.ammo >= player.maxAmmo) {
+                        player.ammo = player.maxAmmo;
+                        player.isReloading = false;
+                    } else {
+                        // 연속 장전을 위한 리셋
+                        player.reloadTimer = 0; // 즉시 다음 발 장전 시작
+                        player.isQuickReloadAttempted = false; // 다음 발 기회 초기화
+                        
+                        // 새로운 스윗스팟 생성 (리듬감 있는 입력을 위해)
+                        const minTime = currentWeapon.quickReloadMinTimePercent;
+                        const maxTime = currentWeapon.quickReloadMaxTimePercent;
+                        const difficulty = currentWeapon.quickReloadDifficultyPercent;
+                        player.quickReloadSweetSpot = minTime + Math.random() * (maxTime - minTime);
+                        player.quickReloadHitWindowStart = Math.max(0, player.quickReloadSweetSpot - difficulty / 2);
+                        player.quickReloadHitWindowEnd = Math.min(1, player.quickReloadSweetSpot + difficulty / 2);
+                    }
+                } else {
+                    // 매거진 타입: 즉시 완충 및 재장전 종료
+                    player.ammo = player.maxAmmo; 
+                    player.isReloading = false; 
+                }
+                
+                // 성공 텍스트 표시 (탄피형은 +2 표시됨)
+                createFloatingText(player.x, player.y - 60, successText, false, '#22c55e');
+                
+                return; // 쿨다운 적용 후 즉시 리턴
+            } else {
+                // 빠른 재장전 실패!
+                soundService.play('quickReloadFail');
+                player.quickReloadShakeTimer = GAME_SETTINGS.quickReloadShakeDuration; // 흔들림 타이머 시작
+                createFloatingText(player.x, player.y - 60, GAME_TEXT.HUD.QUICK_RELOAD_FAIL, false, '#ef4444'); // 빨간색 텍스트
+                
+                // [NEW] 쉘 타입(샷건)의 경우 실패 시 재장전을 중단하지 않고 락(Lock) 상태로 전환
+                // 해당 게이지가 다 찰 때까지는 입력이 무시됨
+                if (currentWeapon.reloadType === 'shell') {
+                    player.isQuickReloadFailed = true;
+                }
+                // 매거진 타입은 실패해도 재장전 계속 진행 (아무 효과 없음)
+                return; // 실패 시에도 이번 프레임 발사 방지
+            }
         }
-        return; // 빠른 재장전 시도는 발사 시도를 대체하므로 여기서 리턴
+
+        // 2. 빠른 재장전 시도가 아니거나(범위 밖/이미 시도함), 쉘 타입이고 탄약이 있다면 발사(인터럽트) 허용
+        if (currentWeapon.reloadType === 'shell' && player.ammo > 0) {
+            player.isReloading = false;
+            // 여기서 리턴하지 않고 아래 발사 로직으로 이어집니다.
+        } else {
+            // 그 외(매거진 타입 등)의 경우 재장전 중에는 발사 불가
+            return; 
+        }
     }
     
+    // [MODIFIED] 탄약 고갈 처리 로직 수정
     if (player.ammo <= 0) {
-      reload();
+      if (currentWeapon.reloadMethod === 'manual') {
+          // 수동 재장전 무기(샷건)는 자동으로 재장전되지 않고, 클릭 시 빈 총 소리(Dry Fire)를 냅니다.
+          // 사운드 중첩 방지를 위해 최소 간격을 둡니다. (예: 200ms)
+          if (now - lastShotTimeRef.current > 200) {
+              if (onDryFireRef.current) onDryFireRef.current(); // UI 효과
+              soundService.play('dryFire');
+              lastShotTimeRef.current = now;
+          }
+      } else {
+          // 자동 재장전 무기는 바로 재장전 시도
+          reload();
+      }
       return;
     }
 
@@ -1129,11 +1206,43 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
       screenShakeRef.current.duration -= deltaTime;
     }
 
+    // [MODIFIED] 재장전 로직: 'magazine' vs 'shell'
     if (player.isReloading) {
         player.reloadTimer += deltaTime;
-        if (player.reloadTimer >= player.totalReloadTime) {
-            player.ammo = player.maxAmmo;
-            player.isReloading = false;
+        
+        if (currentWeapon.reloadType === 'shell') {
+            // [NEW] Shell Type Reload (탄피형) - 샷건
+            // totalReloadTime은 한 발을 장전하는 데 걸리는 시간입니다.
+            if (player.reloadTimer >= player.totalReloadTime) {
+                // [NEW] 장전 사이클이 완료되었으므로 실패로 인한 잠금(Lock)을 해제합니다.
+                player.isQuickReloadFailed = false;
+
+                player.ammo++; // 탄약 1발 증가
+                soundService.play('shellLoad'); // 장전 사운드 (짤막한 찰칵)
+                player.reloadTimer = 0; // 타이머 리셋
+
+                // 탄약이 꽉 찼으면 재장전 종료
+                if (player.ammo >= player.maxAmmo) {
+                    player.ammo = player.maxAmmo;
+                    player.isReloading = false;
+                } else {
+                    // [NEW] 다음 발 장전을 위한 스윗스팟 재설정
+                    player.isQuickReloadAttempted = false; // 다음 발 기회 초기화
+                    
+                    const minTime = currentWeapon.quickReloadMinTimePercent;
+                    const maxTime = currentWeapon.quickReloadMaxTimePercent;
+                    const difficulty = currentWeapon.quickReloadDifficultyPercent;
+                    player.quickReloadSweetSpot = minTime + Math.random() * (maxTime - minTime);
+                    player.quickReloadHitWindowStart = Math.max(0, player.quickReloadSweetSpot - difficulty / 2);
+                    player.quickReloadHitWindowEnd = Math.min(1, player.quickReloadSweetSpot + difficulty / 2);
+                }
+            }
+        } else {
+            // Magazine Type Reload (탄창형) - 기존 로직
+            if (player.reloadTimer >= player.totalReloadTime) {
+                player.ammo = player.maxAmmo;
+                player.isReloading = false;
+            }
         }
     }
 
@@ -2046,7 +2155,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
         
 
         // 재장전 진행 바 (노란색)
-        ctx.fillStyle = '#eab308'; 
+        // [NEW] 재장전 실패(락) 상태일 경우 회색으로 표시하여 시각적 피드백 제공
+        ctx.fillStyle = p.isQuickReloadFailed ? '#6b7280' : '#eab308'; 
         ctx.fillRect(p.x - barWidth / 2 + (1 * scale) + shakeOffsetX, p.y + yOffset + (1 * scale) + shakeOffsetY, (barWidth - (2 * scale)) * reloadProgress, barHeight - (2 * scale));
 
         // [MODIFIED] 빠른 재장전 스윗스팟 화살표 (빨간색)는 재장전 중이면 항상 표시합니다.

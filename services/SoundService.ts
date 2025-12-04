@@ -1,3 +1,4 @@
+
 import { SOUND_SETTINGS } from '../config/gameConfig';
 
 class SoundService {
@@ -190,7 +191,7 @@ class SoundService {
     }
   }
 
-  public play(soundName: 'shoot' | 'impact' | 'footstep' | 'reload' | 'playerHit' | 'itemPickup' | 'uiSelect' | 'quickReloadSuccess' | 'quickReloadFail' | 'dodge' | 'dodgeLand' | 'sprintCollide' | 'staminaEmpty') {
+  public play(soundName: 'shoot' | 'impact' | 'footstep' | 'reload' | 'playerHit' | 'itemPickup' | 'uiSelect' | 'quickReloadSuccess' | 'quickReloadFail' | 'dodge' | 'dodgeLand' | 'sprintCollide' | 'staminaEmpty' | 'shellLoad' | 'dryFire') {
     // 컨텍스트가 없으면(초기화 안됨) 실행하지 않음
     if (!this.context) return;
     if (this.context.state === 'suspended') this.context.resume();
@@ -216,6 +217,8 @@ class SoundService {
       case 'dodgeLand': this.synthDodgeLand(); break;
       case 'sprintCollide': this.synthSprintCollide(); break;
       case 'staminaEmpty': this.synthStaminaEmpty(); break;
+      case 'shellLoad': this.synthShellLoad(); break;
+      case 'dryFire': this.synthDryFire(); break;
     }
   }
 
@@ -237,6 +240,73 @@ class SoundService {
   }
 
   // --- 신디사이저 (합성음) 로직 ---
+
+  // [NEW] 탄약 부족 시 사격음 (찰칵 - Dry Fire)
+  private synthDryFire() {
+    if (!this.context) return;
+    const t = this.context.currentTime;
+    const vol = SOUND_SETTINGS.masterVolume * 0.8;
+
+    // 아주 짧고 날카로운 기계음 (High-passed Square Click)
+    const osc = this.context.createOscillator();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(800, t);
+    osc.frequency.exponentialRampToValueAtTime(1000, t + 0.05);
+
+    const gain = this.context.createGain();
+    gain.gain.setValueAtTime(vol, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+
+    // 필터를 통해 날카로운 소리만 남김
+    const filter = this.context.createBiquadFilter();
+    filter.type = 'highpass';
+    filter.frequency.setValueAtTime(2000, t);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.context.destination);
+    osc.start(t);
+    osc.stop(t + 0.05);
+  }
+
+  // [NEW] 샷건 쉘 한 발 장전음 (짧은 찰칵)
+  private synthShellLoad() {
+    if (!this.context) return;
+    const t = this.context.currentTime;
+    const vol = SOUND_SETTINGS.masterVolume;
+
+    // 플라스틱/금속이 부딪히는 짧은 소리
+    const osc = this.context.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(300, t);
+    osc.frequency.exponentialRampToValueAtTime(100, t + 0.05);
+
+    const gain = this.context.createGain();
+    gain.gain.setValueAtTime(vol * 0.6, t);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+
+    osc.connect(gain);
+    gain.connect(this.context.destination);
+    osc.start(t);
+    osc.stop(t + 0.05);
+
+    // 노이즈 추가 (마찰음)
+    const bufferSize = this.context.sampleRate * 0.05;
+    const buffer = this.context.createBuffer(1, bufferSize, this.context.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+    const noise = this.context.createBufferSource();
+    noise.buffer = buffer;
+    
+    const noiseGain = this.context.createGain();
+    noiseGain.gain.setValueAtTime(vol * 0.3, t);
+    noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+
+    noise.connect(noiseGain);
+    noiseGain.connect(this.context.destination);
+    noise.start(t);
+  }
 
   // [NEW] 스테미나 부족 시 재생되는 짧은 경고음
   private synthStaminaEmpty() {

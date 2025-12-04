@@ -1,3 +1,4 @@
+
 // weaponDb.ts
 // 이 파일은 모든 무기의 상세 능력치를 관리하는 중앙 데이터베이스입니다.
 // 무기 스탯을 수정하거나 새로운 무기를 추가하고 싶다면, 이 파일만 수정하면 됩니다.
@@ -103,6 +104,8 @@ export const WEAPON_DATABASE = {
       recoilRecovery: 10, // 명중률 회복 속도. 높을수록 실제 명중률이 빠르게 회복됩니다.
       maxAmmo: 8, // 최대 장탄수
       reloadTime: 1200, // 재장전 시간 (ms)
+      reloadType: 'magazine', // [NEW] 재장전 타입: 'magazine' (전체) or 'shell' (1발씩)
+      reloadMethod: 'auto', // [NEW] 'auto' (탄약 0일 때 자동 재장전) or 'manual' (직접 R 눌러야 함)
       // [NEW] 빠른 재장전 시스템 설정
       quickReloadMinTimePercent: 0.45, // 빠른 재장전 화살표 표시 최소 진행도 (30%)
       quickReloadMaxTimePercent: 0.8, // 빠른 재장전 화살표 표시 최대 진행도 (70%)
@@ -113,6 +116,13 @@ export const WEAPON_DATABASE = {
       menuIconScale: 1.5, // [NEW] 메인 메뉴 아이콘 크기 배율. 1.0이 기본.
       hudIconScale: 2, // 인게임 HUD 아이콘 크기 배율. 1 = 100%, 1.5 = 150%.
       upgradeImageScale: 0.5, // 업그레이드 화면 이미지 크기 배율.
+      // [NEW] 탄약 UI 설정
+      ammoUi: {
+        layout: 'single', // 'single' (1열) or 'double' (2열 지그재그)
+        bulletWidth: 10, // px
+        bulletHeight: 24, // px
+        gap: 4, // px
+      },
       gunRightOffset: 5, // 총기의 좌우 위치 오프셋 (px). 플레이어 중심에서 오른쪽으로 얼마나 떨어져서 그려지는지 결정합니다.
       muzzleFlashSize: 10, // 총구 화염 크기 (px)
       muzzleFlashOffset: 12, // 총구 화염 위치 오프셋 (px)
@@ -167,6 +177,8 @@ export const WEAPON_DATABASE = {
       recoilRecovery: 40,
       maxAmmo: 30,
       reloadTime: 1500,
+      reloadType: 'magazine', // 일반 탄창
+      reloadMethod: 'auto', // 자동 재장전
       // [NEW] 빠른 재장전 시스템 설정
       quickReloadMinTimePercent: 0.4, // 40%
       quickReloadMaxTimePercent: 0.7, // 80%
@@ -176,6 +188,13 @@ export const WEAPON_DATABASE = {
       menuIconScale: 1.4, // [NEW] 메인 메뉴 아이콘 크기 배율.
       hudIconScale: 2, // 인게임 HUD 아이콘 크기 배율. 1 = 100%, 1.5 = 150%.
       upgradeImageScale: 0.5, // 업그레이드 화면 이미지 크기 배율.
+      // [NEW] 탄약 UI 설정 (MP5는 2열 탄창)
+      ammoUi: {
+        layout: 'double', 
+        bulletWidth: 8, // 조금 작게
+        bulletHeight: 20, 
+        gap: 3, 
+      },
       gunRightOffset: 6,
       muzzleFlashSize: 8,
       muzzleFlashOffset: 18,
@@ -231,6 +250,8 @@ export const WEAPON_DATABASE = {
       recoilRecovery: 5,
       maxAmmo: 5,
       reloadTime: 2500,
+      reloadType: 'magazine',
+      reloadMethod: 'auto', // 자동 재장전
       // [NEW] 빠른 재장전 시스템 설정
       quickReloadMinTimePercent: 0.5, // 50%
       quickReloadMaxTimePercent: 0.7, // 60%
@@ -240,6 +261,13 @@ export const WEAPON_DATABASE = {
       menuIconScale: 1.4, // [NEW] 메인 메뉴 아이콘 크기 배율.
       hudIconScale: 2, // 인게임 HUD 아이콘 크기 배율. 1 = 100%, 1.5 = 150%.
       upgradeImageScale: 0.5, // 업그레이드 화면 이미지 크기 배율.
+      // [NEW] 탄약 UI 설정 (Rifle은 큰 탄환)
+      ammoUi: {
+        layout: 'single', 
+        bulletWidth: 12, // 크게
+        bulletHeight: 32, // 길게
+        gap: 6, 
+      },
       gunRightOffset: 8,
       muzzleFlashSize: 15,
       muzzleFlashOffset: 25,
@@ -292,16 +320,25 @@ export const WEAPON_DATABASE = {
       gunRecoil: 25, // 시각적 반동 강함
       recoilRecovery: 5,
       maxAmmo: 6,
-      reloadTime: 2000, // 재장전 느림
+      reloadTime: 500, // [MODIFIED] 탄피형 장전이므로 '발당' 장전 시간으로 수정. 더 빠르게.
+      reloadType: 'shell', // [NEW] 탄피형(한발씩) 장전
+      reloadMethod: 'manual', // [NEW] 수동 재장전 (탄약 0일 때 R 눌러야 함)
       // [NEW] 빠른 재장전 시스템 설정
-      quickReloadMinTimePercent: 0.4, // 20%
+      quickReloadMinTimePercent: 0.5, // 20%
       quickReloadMaxTimePercent: 0.8, // 60%
-      quickReloadDifficultyPercent: 0.10, // 20%
+      quickReloadDifficultyPercent: 0.30, // 20%
     },
     visuals: {
       menuIconScale: 1.4, // [NEW] 메인 메뉴 아이콘 크기 배율.
       hudIconScale: 2, // 인게임 HUD 아이콘 크기 배율. 1 = 100%, 1.5 = 150%.
       upgradeImageScale: 0.5, // 업그레이드 화면 이미지 크기 배율.
+      // [NEW] 탄약 UI 설정 (Shotgun은 굵고 짧은 쉘)
+      ammoUi: {
+        layout: 'single', 
+        bulletWidth: 14, 
+        bulletHeight: 26, 
+        gap: 5, 
+      },
       gunRightOffset: 8,
       muzzleFlashSize: 20,
       muzzleFlashOffset: 20,

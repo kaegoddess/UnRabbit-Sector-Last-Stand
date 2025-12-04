@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -69,6 +70,16 @@
         /* 0 0 5px: 첫 번째 그림자는 텍스트에 가장 가깝고 가장 밝습니다. (x-offset, y-offset, blur-radius, color) */
         /* 0 0 10px: 두 번째 그림자는 더 넓게 퍼져 부드러운 후광을 만듭니다. */
         text-shadow: 0 0 5px rgba(250, 204, 21, 0.5), 0 0 10px rgba(250, 204, 21, 0.3);
+      }
+
+      /* [NEW] 좌우 흔들림 애니메이션 (탄약 부족 시 경고용) */
+      @keyframes shake-x {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-4px); }
+        75% { transform: translateX(4px); }
+      }
+      .animate-shake-x {
+        animation: shake-x 0.2s ease-in-out;
       }
     </style>
   <script type="importmap">
