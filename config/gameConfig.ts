@@ -1,9 +1,8 @@
 // 게임 밸런스 및 설정을 위한 데이터베이스 (시스템, 사운드 등)
 // 좀비 설정은 zombieConfig.ts, 무기 설정은 weaponConfig.ts, 플레이어 설정은 playerConfig.ts 참조
 
-// [NEW] 게임 버전 관리
-// 이 값은 제가 코드를 수정할 때마다 자동으로 0.01씩 증가합니다.
-export const GAME_VERSION = "0.46";
+// 게임 버전
+export const GAME_VERSION = "0.48";
 
 // 거리 단위: 픽셀(px)
 // 시간 단위: 밀리초(ms) 또는 초(s)

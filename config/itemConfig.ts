@@ -3,7 +3,6 @@
 // 새로운 아이템을 추가하거나 밸런스를 조정하고 싶다면 이 파일만 수정하면 됩니다.
 
 import { Item, ItemType } from '../types';
-import { RENDER_SETTINGS } from './gameConfig'; // config 폴더 내에서 상대 경로 변경됨
 
 // 각 아이템의 상세 정보를 정의하는 인터페이스입니다.
 interface ItemInfo {
