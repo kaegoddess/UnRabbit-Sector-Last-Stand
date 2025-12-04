@@ -190,7 +190,7 @@ class SoundService {
     }
   }
 
-  public play(soundName: 'shoot' | 'impact' | 'footstep' | 'reload' | 'playerHit' | 'itemPickup' | 'uiSelect' | 'quickReloadSuccess' | 'quickReloadFail' | 'dodge' | 'dodgeLand' | 'sprintCollide') {
+  public play(soundName: 'shoot' | 'impact' | 'footstep' | 'reload' | 'playerHit' | 'itemPickup' | 'uiSelect' | 'quickReloadSuccess' | 'quickReloadFail' | 'dodge' | 'dodgeLand' | 'sprintCollide' | 'staminaEmpty') {
     // 컨텍스트가 없으면(초기화 안됨) 실행하지 않음
     if (!this.context) return;
     if (this.context.state === 'suspended') this.context.resume();
@@ -215,6 +215,7 @@ class SoundService {
       case 'dodge': this.synthDodge(); break;
       case 'dodgeLand': this.synthDodgeLand(); break;
       case 'sprintCollide': this.synthSprintCollide(); break;
+      case 'staminaEmpty': this.synthStaminaEmpty(); break;
     }
   }
 
@@ -236,6 +237,28 @@ class SoundService {
   }
 
   // --- 신디사이저 (합성음) 로직 ---
+
+  // [NEW] 스테미나 부족 시 재생되는 짧은 경고음
+  private synthStaminaEmpty() {
+    if (!this.context) return;
+    const t = this.context.currentTime;
+    // 볼륨을 낮춰서 플레이어에게 거슬리지 않도록 합니다.
+    const vol = SOUND_SETTINGS.masterVolume * 0.4;
+
+    const osc = this.context.createOscillator();
+    osc.type = 'square'; // '삑' 하는 느낌의 디지털 사운드
+    osc.frequency.setValueAtTime(80, t); // 낮은 주파수에서 시작
+    osc.frequency.exponentialRampToValueAtTime(40, t + 0.1); // 더 낮은 주파수로 떨어지며 '뚝' 끊어지는 느낌을 줍니다.
+
+    const gain = this.context.createGain();
+    gain.gain.setValueAtTime(vol, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1); // 0.1초만에 소리가 사라지도록 하여 짧게 만듭니다.
+
+    osc.connect(gain);
+    gain.connect(this.context.destination);
+    osc.start(t);
+    osc.stop(t + 0.1); // 0.1초 후에 소리를 강제로 정지시킵니다.
+  }
 
   private synthDodge() {
     if (!this.context) return;

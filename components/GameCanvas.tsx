@@ -63,6 +63,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
     maxStamina: PLAYER_STATS.maxStamina,
     isSprinting: false,
     staminaRechargeDelayTimer: 0,
+    staminaWarningTimer: 0, // [NEW] 스테미나 부족 경고 타이머
     isDodging: false,
     dodgeTimer: 0,
     dodgeDuration: PLAYER_STATS.dodgeDuration,
@@ -119,6 +120,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
     const player = playerRef.current;
     // 닷지 중이거나, 재장전 중이거나, 스테미나가 부족하면 닷지할 수 없습니다.
     if (player.isDodging || player.isReloading || player.stamina < PLAYER_STATS.dodgeStaminaCost) {
+      // [NEW] 스테미나가 부족해서 닷지를 못한 것이라면 경고 효과를 발동합니다.
+      if (!player.isDodging && !player.isReloading && player.stamina < PLAYER_STATS.dodgeStaminaCost) {
+          player.staminaWarningTimer = 0.3; // 0.3초 동안 흔들림
+          soundService.play('staminaEmpty');
+      }
       return;
     }
 
@@ -382,6 +388,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
       maxStamina: PLAYER_STATS.maxStamina,
       isSprinting: false,
       staminaRechargeDelayTimer: 0,
+      staminaWarningTimer: 0, // [NEW] 스테미나 부족 경고 타이머 초기화
       isDodging: false,
       dodgeTimer: 0,
       dodgeDuration: PLAYER_STATS.dodgeDuration,
@@ -978,8 +985,23 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
       }
     }
 
+    // --- [NEW] 스테미나 경고 타이머 업데이트 ---
+    if (player.staminaWarningTimer > 0) {
+      player.staminaWarningTimer -= deltaTime;
+    }
+
     // --- [NEW] 전력질주 로직 ---
     const isSprintingInput = (keysRef.current['ShiftLeft'] || keysRef.current['ShiftRight']) && isMoving && !player.isReloading && !player.isDodging;
+    
+    // [NEW] 스테미나가 부족한 상태에서 전력질주를 시도했는지 확인합니다.
+    if (isSprintingInput && player.stamina <= 0) {
+        // 이미 경고 타이머가 돌고있지 않을 때만 효과를 발동시켜 소리가 반복 재생되는 것을 막습니다.
+        if (player.staminaWarningTimer <= 0) {
+            player.staminaWarningTimer = 0.3;
+            soundService.play('staminaEmpty');
+        }
+    }
+
     player.isSprinting = isSprintingInput && player.stamina > 0;
 
     if (player.isSprinting) {
@@ -1925,8 +1947,20 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
     
     // --- [NEW] 스테미나 UI 그리기 ---
     const gaugeCfg = PLAYER_UI_SETTINGS.staminaGauge;
-    const gaugeX = p.x + gaugeCfg.offsetX;
-    const gaugeY = p.y + gaugeCfg.offsetY;
+
+    // [NEW] 스테미나 부족 경고 시 흔들림 효과 추가
+    let shakeOffsetX = 0;
+    let shakeOffsetY = 0;
+    const isStaminaWarning = p.staminaWarningTimer > 0;
+    if (isStaminaWarning) {
+        const shakeIntensity = 3; // 흔들림의 강도. 이 값을 높이면 더 많이 흔들립니다.
+        shakeOffsetX = (Math.random() - 0.5) * shakeIntensity;
+        shakeOffsetY = (Math.random() - 0.5) * shakeIntensity;
+    }
+    
+    const gaugeX = p.x + gaugeCfg.offsetX + shakeOffsetX;
+    const gaugeY = p.y + gaugeCfg.offsetY + shakeOffsetY;
+
     const numSegments = Math.ceil(p.maxStamina / gaugeCfg.staminaPerSegment);
     const filledSegments = Math.floor(p.stamina / gaugeCfg.staminaPerSegment);
     const partialSegmentFill = (p.stamina % gaugeCfg.staminaPerSegment) / gaugeCfg.staminaPerSegment;
@@ -1942,8 +1976,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
     ctx.stroke();
 
     // 채워진 칸
+    // [NEW] 스테미나 부족 경고 시 색상을 빨간색으로 변경합니다.
+    const gaugeColor = isStaminaWarning ? '#ef4444' : 'rgba(251, 191, 36, 1)'; // Tailwind red-500 또는 amber-400
+
     for(let i = 0; i < filledSegments; i++) {
-        ctx.strokeStyle = 'rgba(251, 191, 36, 1)'; // amber-400
+        ctx.strokeStyle = gaugeColor;
         const startAngle = (i / numSegments) * Math.PI * 2 - Math.PI / 2;
         const endAngle = ((i + 1) / numSegments) * Math.PI * 2 - Math.PI / 2;
         ctx.beginPath();
@@ -1953,7 +1990,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
     
     // 부분적으로 채워진 칸
     if (partialSegmentFill > 0 && filledSegments < numSegments) {
-        ctx.strokeStyle = 'rgba(251, 191, 36, 1)';
+        ctx.strokeStyle = gaugeColor;
         const startAngle = (filledSegments / numSegments) * Math.PI * 2 - Math.PI / 2;
         const endAngle = startAngle + (partialSegmentFill / numSegments) * Math.PI * 2;
         ctx.beginPath();

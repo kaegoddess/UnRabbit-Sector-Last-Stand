@@ -64,6 +64,7 @@ export interface Player extends Entity {
   maxStamina: number;
   isSprinting: boolean;
   staminaRechargeDelayTimer: number;
+  staminaWarningTimer: number; // 스테미나 부족 경고 효과 타이머
 
   // [NEW] 닷지 시스템
   isDodging: boolean;

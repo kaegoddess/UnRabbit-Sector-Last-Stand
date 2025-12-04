@@ -3,7 +3,7 @@
 
 // [NEW] 게임 버전 관리
 // 이 값은 제가 코드를 수정할 때마다 자동으로 0.01씩 증가합니다.
-export const GAME_VERSION = "0.43";
+export const GAME_VERSION = "0.46";
 
 // 거리 단위: 픽셀(px)
 // 시간 단위: 밀리초(ms) 또는 초(s)
@@ -36,6 +36,7 @@ export const SOUND_SETTINGS = {
     dodge: 'sound/dodge.mp3',
     dodgeLand: 'sound/dodge_land.mp3',
     sprintCollide: 'sound/sprint_collide.mp3',
+    staminaEmpty: 'sound/stamina_empty.mp3', // 스테미나 부족 경고음
   }
 };
 
