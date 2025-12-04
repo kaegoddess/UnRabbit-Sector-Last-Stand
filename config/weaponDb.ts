@@ -227,7 +227,7 @@ export const WEAPON_DATABASE = {
       maxSpreadMoving: 1,
       movementStability: 1,
       aimDelay: 0.25,
-      gunRecoil: 30,
+      gunRecoil: 35,
       recoilRecovery: 5,
       maxAmmo: 5,
       reloadTime: 2500,
@@ -289,7 +289,7 @@ export const WEAPON_DATABASE = {
       maxSpreadMoving: 1.2,
       movementStability: 1.5,
       aimDelay: 0.15,
-      gunRecoil: 40, // 시각적 반동 강함
+      gunRecoil: 25, // 시각적 반동 강함
       recoilRecovery: 5,
       maxAmmo: 6,
       reloadTime: 2000, // 재장전 느림

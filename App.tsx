@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import GameCanvas from './components/GameCanvas';
 import { GameStatus, WeaponPart, UpgradeState } from './types';
@@ -10,6 +8,8 @@ import { soundService } from './services/SoundService';
 import { GAME_TEXT } from './config/textConfig';
 import { UPGRADE_CONFIG } from './config/upgradeConfig'; // 업그레이드 중앙 설정 파일 임포트
 import { GAME_VERSION } from './config/gameConfig'; // [NEW] 게임 버전 임포트
+import { ASSETS } from './config/assetConfig'; // [NEW] 중앙 에셋 설정 파일 임포트
+import FallbackImage from './components/FallbackImage'; // [NEW] 폴백 이미지 컴포넌트 임포트
 
 interface UICasing {
   id: string;
@@ -36,19 +36,6 @@ interface UpgradePositionInfo {
     y: number;
   };
 }
-
-const ASSETS = {
-  CHAR_DEFAULT: "https://storage.cloud.google.com/kaelove_game_01/Gemini_Generated_bunny.png",
-  CHAR_MP5: "https://storage.cloud.google.com/kaelove_game_01/Gemini_Generated_bunny_mp5.png",
-  CHAR_RIFLE: "https://storage.cloud.google.com/kaelove_game_01/Gemini_Generated_bunny_rifle.png",
-  CHAR_SHOTGUN: "https://storage.cloud.google.com/kaelove_game_01/Gemini_Generated_bunny_shotgun.png",
-  WEAPON_M1911: "https://storage.cloud.google.com/kaelove_game_01/Gemini_Generated_m1911.png",
-  WEAPON_MP5: "https://storage.cloud.google.com/kaelove_game_01/Gemini_Generated_mp5.png",
-  WEAPON_RIFLE: "https://storage.cloud.google.com/kaelove_game_01/bunny_Rifle.png",
-  WEAPON_SHOTGUN: "https://storage.cloud.google.com/kaelove_game_01/Gemini_Generated_Shotgun.png",
-  LOADING_SCREEN: "https://storage.cloud.google.com/kaelove_game_01/Gemini_Generated_loding01.png",
-  CHAR_SAD: "https://storage.cloud.google.com/kaelove_game_01/Gemini_Generated_sad.png"
-};
 
 const getRandomText = (array: string[]): string => {
   if (!array || array.length === 0) {
@@ -197,10 +184,10 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const preloadAssets = async () => {
-      const baseAssetUrls = Object.values(ASSETS);
-      // UPGRADE_CONFIG에서 아이콘 URL을 가져오도록 수정
-      const upgradeIconUrls = Object.values(UPGRADE_CONFIG).map(part => part.ICON);
-      const imageUrls = [...new Set([...baseAssetUrls, ...upgradeIconUrls])]; // 중복 제거
+      // [MODIFIED] assetConfig.ts에서 에셋 URL 배열을 가져옵니다.
+      // 각 에셋의 두 번째 URL(클라우드 URL)을 로딩 대상으로 사용합니다.
+      const baseAssetUrls = Object.values(ASSETS).map(paths => paths[1]); 
+      const imageUrls = [...new Set(baseAssetUrls)]; // 중복 제거
 
       const totalAssets = imageUrls.length + Object.keys(soundService.SOUND_ASSETS_CONFIG).length; // 사운드 에셋 개수 포함
       let loadedCount = 0;
@@ -666,7 +653,7 @@ export const GAME_OVER_UI_SETTINGS = {
         className={`relative w-full h-screen bg-black flex flex-col items-center justify-center overflow-hidden text-white select-none ${!isLoadingAssets ? 'cursor-pointer' : ''}`}
       >
          <div className="absolute inset-0 z-0">
-            <img src={ASSETS.LOADING_SCREEN} className="w-full h-full object-cover opacity-80 filter contrast-110" alt="Loading Background" />
+            <FallbackImage srcs={ASSETS.LOADING_SCREEN} className="w-full h-full object-cover opacity-80 filter contrast-110" alt="Loading Background" />
             <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/20"></div>
          </div>
          <div className="z-10 w-full max-w-4xl px-8 flex flex-col h-full justify-end pb-20">
@@ -933,8 +920,8 @@ export const GAME_OVER_UI_SETTINGS = {
         
         {/* 오른쪽 하단 캐릭터 초상화 및 체력바 */}
         <div style={hudStyle} className="absolute flex flex-col gap-2 z-10 opacity-90 pointer-events-none pr-2">
-            <img
-                src={currentWeaponAsset.char}
+            <FallbackImage
+                srcs={currentWeaponAsset.char}
                 alt={GAME_TEXT.MENU.CHAR_NAME}
                 className="w-full h-full object-contain object-bottom"
             />
@@ -1063,8 +1050,8 @@ export const GAME_OVER_UI_SETTINGS = {
                           className="absolute top-0 left-0 z-10 flex items-center justify-center"
                           style={{ ...weaponTiltStyle, transformStyle: 'preserve-3d' }}
                       >
-                          <img 
-                              src={currentWeaponAsset.upgradeImage} 
+                          <FallbackImage 
+                              srcs={currentWeaponAsset.upgradeImage} 
                               alt={WEAPONS[selectedWeaponKey].name}
                               className={`max-w-none drop-shadow-[0_0_30px_rgba(0,0,0,0.8)] transition-opacity duration-300 ${upgradeWeaponLoaded ? 'opacity-100' : 'opacity-0'}`}
                               onLoad={() => setUpgradeWeaponLoaded(true)}
@@ -1101,7 +1088,7 @@ export const GAME_OVER_UI_SETTINGS = {
                                       <div className="flex gap-3 items-center mb-2">
                                           <div className={`w-14 h-14 shrink-0 border-2 relative ${isMaxed ? 'border-yellow-500/30 bg-yellow-900/10' : 'border-green-900/20'} flex items-center justify-center rounded-md`}>
                                               {!loadedUpgradeIcons[part] && <div className="w-8 h-8 border border-green-500/30 flex items-center justify-center"><div className="w-1 h-1 bg-green-500/50 rounded-full"></div></div>}
-                                              <img src={info.ICON} alt={info.NAME} className={`absolute inset-0 w-full h-full object-contain p-1 transition-opacity duration-300 ${loadedUpgradeIcons[part] ? 'opacity-100' : 'opacity-0'}`} onLoad={() => setLoadedUpgradeIcons(prev => ({...prev, [part]: true}))}/>
+                                              <FallbackImage srcs={info.ICON} alt={info.NAME} className={`absolute inset-0 w-full h-full object-contain p-1 transition-opacity duration-300 ${loadedUpgradeIcons[part] ? 'opacity-100' : 'opacity-0'}`} onLoad={() => setLoadedUpgradeIcons(prev => ({...prev, [part]: true}))}/>
                                           </div>
                                           <div className="flex-1 flex flex-col justify-center h-14">
                                               <div className="flex justify-between items-baseline mb-0.5"><span className={`font-bold text-sm ${isMaxed ? 'text-yellow-500' : 'text-green-400'}`}>{info.NAME}</span></div>
@@ -1165,9 +1152,9 @@ export const GAME_OVER_UI_SETTINGS = {
               <div className="relative border-2 border-green-700 bg-black h-full overflow-hidden rounded group flex-1">
                   {!currentWeaponAsset.charLoaded && <TacticalLoader className="absolute inset-0 z-20" />}
                   {Object.entries(WEAPON_ASSETS).map(([key, asset]) => (
-                      <img 
+                      <FallbackImage 
                           key={key}
-                          src={asset.char} 
+                          srcs={asset.char} 
                           alt={GAME_TEXT.MENU.CHAR_NAME} 
                           className={`absolute inset-0 w-full h-full object-cover object-[40%_50%] transition-opacity duration-300 ${selectedWeaponKey === key ? 'opacity-100 z-10' : 'opacity-0 z-0'}`} 
                           onLoad={() => asset.setCharLoaded(true)}
@@ -1225,8 +1212,8 @@ export const GAME_OVER_UI_SETTINGS = {
                                       
                                       {/* [수정] 무기 아이콘 컨테이너의 높이를 `h-28`로 고정합니다. */}
                                       <div className="relative w-full h-28 flex items-center justify-center overflow-hidden">
-                                          <img 
-                                              src={assetInfo.weapon} 
+                                          <FallbackImage 
+                                              srcs={assetInfo.weapon} 
                                               alt={weapon.name} 
                                               className={`w-full h-full object-contain drop-shadow-lg transition-opacity duration-300 ${assetInfo.weaponLoaded ? 'opacity-100' : 'opacity-0'}`}
                                               style={{ transform: `scale(${weapon.menuIconScale || 1})` }}
@@ -1275,8 +1262,8 @@ export const GAME_OVER_UI_SETTINGS = {
         )}
         
         <div className="relative max-w-md w-full p-8 bg-gray-900 border-2 border-red-800 shadow-[0_0_50px_rgba(220,38,38,0.3)] rounded-lg text-center">
-          <img
-              src={ASSETS.CHAR_SAD}
+          <FallbackImage
+              srcs={ASSETS.CHAR_SAD}
               alt="Mission Failed"
               className="absolute z-0 pointer-events-none drop-shadow-[0_0_20px_rgba(0,0,0,0.8)]"
               style={gameOverImageStyle}
