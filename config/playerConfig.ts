@@ -1,3 +1,4 @@
+
 // 플레이어 관련 설정
 
 export const PLAYER_STATS = {
@@ -93,6 +94,15 @@ export const PLAYER_UI_SETTINGS = {
   }
 };
 
+// [NEW] 플레이어 레벨업 관련 설정입니다.
+export const PLAYER_LEVELING_SETTINGS = {
+  // 레벨 1에서 레벨 2로 가기 위해 필요한 초기 경험치량입니다.
+  // 이 값을 높이면 게임 초반 레벨업이 더 어려워집니다. (예: 150)
+  baseMaxXp: 100, 
+  // 레벨업에 필요한 경험치가 다음 레벨로 갈 때마다 얼마나 증가하는지 설정합니다.
+  // 1.2는 매 레벨마다 20%씩 필요 경험치가 증가함을 의미합니다. (예: 1.3은 30% 증가)
+  xpMultiplierPerLevel: 1.2,
+};
 
 // 인게임 HUD 우측 하단에 표시되는 캐릭터 초상화의 기본 위치와 크기입니다.
 // `rem` 단위로 지정되며, 1rem은 약 16px에 해당합니다.

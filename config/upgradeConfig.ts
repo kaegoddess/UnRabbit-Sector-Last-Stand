@@ -1,11 +1,10 @@
+
 // upgradeConfig.ts
 // 이 파일은 무기 부품 업그레이드에 대한 모든 정보를 중앙에서 관리합니다.
 // 부품의 이름, 설명, 아이콘, 최대 레벨, 그리고 가장 중요한 게임 내 실제 성능 효과까지 여기서 모두 설정할 수 있습니다.
 // 새로운 부품을 추가하거나 밸런스를 조정하고 싶다면 이 파일만 수정하면 됩니다.
 
 import { WeaponPart } from '../types';
-// [FIX] assetConfig에서 ASSETS 객체를 가져와 이미지 경로 배열을 사용하도록 수정합니다.
-// 이렇게 하면 FallbackImage 컴포넌트의 props 타입('string[]')과 일치하여 타입 오류를 해결할 수 있습니다.
 import { ASSETS } from './assetConfig'; 
 
 // 업그레이드 효과의 유형을 정의합니다.
@@ -19,7 +18,7 @@ type UpgradeEffectType = 'ADD' | 'SUBTRACT_PERCENT_BASE' | 'ADD_PERCENT_BASE' | 
 interface UpgradePartInfo {
   NAME: string; // UI에 표시될 부품 이름
   DESC: string; // UI에 표시될 부품 설명
-  ICON: string[]; // [FIX] UI에 표시될 아이콘 이미지 URL을 문자열 배열('string[]')로 변경하여 로컬/클라우드 폴백을 지원합니다.
+  ICON: string[]; // UI에 표시될 아이콘 이미지 URL을 문자열 배열('string[]')로 변경하여 로컬/클라우드 폴백을 지원합니다.
   maxLevel: number; // 이 부품의 최대 업그레이드 레벨
   // 실제 게임 내 성능에 적용될 효과
   statEffect: {
@@ -34,8 +33,7 @@ export const UPGRADE_CONFIG: Record<WeaponPart, UpgradePartInfo> = {
   [WeaponPart.SCOPE]: {
     NAME: "전술 조준경",
     DESC: "시야 범위 +6%",
-    // [FIX] 하드코딩된 URL 대신 ASSETS 객체를 사용하도록 수정합니다.
-    ICON: ASSETS.UPGRADE_ICON_SCOPE,
+    ICON: ASSETS.UPGRADE_ICON_SCOPE, // ASSETS 객체를 사용하도록 수정합니다.
     maxLevel: 5,
     // 효과: 레벨당 zoom 값을 0.05씩 감소시켜 시야를 넓힙니다. (기본값 1.0)
     statEffect: { type: 'SUBTRACT_PERCENT_BASE', stat: 'zoom', value: 0.06 }
@@ -43,8 +41,7 @@ export const UPGRADE_CONFIG: Record<WeaponPart, UpgradePartInfo> = {
   [WeaponPart.BARREL]: {
     NAME: "정밀 총열",
     DESC: "유효 사거리 +10%",
-    // [FIX] 하드코딩된 URL 대신 ASSETS 객체를 사용하도록 수정합니다.
-    ICON: ASSETS.UPGRADE_ICON_BARREL,
+    ICON: ASSETS.UPGRADE_ICON_BARREL, // ASSETS 객체를 사용하도록 수정합니다.
     maxLevel: 5,
     // 효과: 레벨당 기본 maxDistance의 10%만큼 사거리를 증가시킵니다.
     statEffect: { type: 'ADD_PERCENT_BASE', stat: 'maxDistance', value: 0.1 }
@@ -52,8 +49,7 @@ export const UPGRADE_CONFIG: Record<WeaponPart, UpgradePartInfo> = {
   [WeaponPart.MAG]: {
     NAME: "대용량 탄창",
     DESC: "최대 장탄수 +10%",
-    // [FIX] 하드코딩된 URL 대신 ASSETS 객체를 사용하도록 수정합니다.
-    ICON: ASSETS.UPGRADE_ICON_MAG,
+    ICON: ASSETS.UPGRADE_ICON_MAG, // ASSETS 객체를 사용하도록 수정합니다.
     maxLevel: 5,
     // 효과: 레벨당 기본 장탄수의 10%만큼 maxAmmo를 증가시킵니다. (계산 로직은 GameCanvas에서 특별 처리)
     statEffect: { type: 'ADD_PERCENT_BASE', stat: 'maxAmmo', value: 0.1 }
@@ -61,8 +57,7 @@ export const UPGRADE_CONFIG: Record<WeaponPart, UpgradePartInfo> = {
   [WeaponPart.MUZZLE]: {
     NAME: "충격 제동기",
     DESC: "반동 제어력 강화",
-    // [FIX] 하드코딩된 URL 대신 ASSETS 객체를 사용하도록 수정합니다.
-    ICON: ASSETS.UPGRADE_ICON_MUZZLE,
+    ICON: ASSETS.UPGRADE_ICON_MUZZLE, // ASSETS 객체를 사용하도록 수정합니다.
     maxLevel: 5,
     // 효과: 레벨당 recoilControl 값을 1씩 증가시킵니다. 최대 반동까지 걸리는 총알수가 줄어듬.
     statEffect: { type: 'ADD_BONUS', stat: 'recoilControl', value: 1 }
@@ -70,8 +65,7 @@ export const UPGRADE_CONFIG: Record<WeaponPart, UpgradePartInfo> = {
   [WeaponPart.AMMO]: {
     NAME: "철갑탄",
     DESC: "관통 확률 +20%",
-    // [FIX] 하드코딩된 URL 대신 ASSETS 객체를 사용하도록 수정합니다.
-    ICON: ASSETS.UPGRADE_ICON_AMMO,
+    ICON: ASSETS.UPGRADE_ICON_AMMO, // ASSETS 객체를 사용하도록 수정합니다.
     maxLevel: 5,
     // 효과: 레벨당 관통 확률을 20%p씩 증가시킵니다. (계산 로직은 GameCanvas에서 특별 처리)
     statEffect: { type: 'ADD_BONUS', stat: 'penetrationChance', value: 0.20 }
@@ -79,8 +73,7 @@ export const UPGRADE_CONFIG: Record<WeaponPart, UpgradePartInfo> = {
   [WeaponPart.SPRING]: {
     NAME: "강화 스프링",
     DESC: "연사 속도 +10%",
-    // [FIX] 하드코딩된 URL 대신 ASSETS 객체를 사용하도록 수정합니다.
-    ICON: ASSETS.UPGRADE_ICON_SPRING,
+    ICON: ASSETS.UPGRADE_ICON_SPRING, // ASSETS 객체를 사용하도록 수정합니다.
     maxLevel: 5,
     // 효과: 레벨당 기본 fireRate를 10%씩 감소시켜 연사 속도를 높입니다.
     statEffect: { type: 'SUBTRACT_PERCENT_BASE', stat: 'fireRate', value: 0.1 }
@@ -88,8 +81,7 @@ export const UPGRADE_CONFIG: Record<WeaponPart, UpgradePartInfo> = {
   [WeaponPart.GRIP]: {
     NAME: "인체공학 손잡이",
     DESC: "조준 반응 속도 +10%",
-    // [FIX] 하드코딩된 URL 대신 ASSETS 객체를 사용하도록 수정합니다.
-    ICON: ASSETS.UPGRADE_ICON_GRIP,
+    ICON: ASSETS.UPGRADE_ICON_GRIP, // ASSETS 객체를 사용하도록 수정합니다.
     maxLevel: 5,
     // 효과: 레벨당 기본 aimDelay를 10%씩 감소시켜 조준 속도를 높입니다.
     statEffect: { type: 'SUBTRACT_PERCENT_BASE', stat: 'aimDelay', value: 0.1 }
@@ -97,8 +89,7 @@ export const UPGRADE_CONFIG: Record<WeaponPart, UpgradePartInfo> = {
   [WeaponPart.STOCK]: {
     NAME: "전술 개머리판",
     DESC: "공격력 +5%",
-    // [FIX] 하드코딩된 URL 대신 ASSETS 객체를 사용하도록 수정합니다.
-    ICON: ASSETS.UPGRADE_ICON_STOCK,
+    ICON: ASSETS.UPGRADE_ICON_STOCK, // ASSETS 객체를 사용하도록 수정합니다.
     maxLevel: 5,
     // 효과: 레벨당 기본 공격력의 5%만큼 데미지가 증가합니다.
     statEffect: { type: 'ADD_PERCENT_BASE', stat: 'damage', value: 0.05 }

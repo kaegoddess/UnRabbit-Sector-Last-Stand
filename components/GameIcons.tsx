@@ -1,18 +1,14 @@
-import React, { useState } from 'react';
-import { GAME_TEXT } from '../config/textConfig';
 
-// Define props for WeaponIcon
-interface WeaponIconProps {
-  imagePaths: string[];
-  fallback: React.ReactElement;
-  className?: string;
-  alt: string;
-  style?: React.CSSProperties;
-}
+
+import React, { useState, useEffect } from 'react';
+import { GAME_TEXT } from '../config/textConfig';
+import { ASSETS } from '../config/assetConfig';
+import FallbackImage from './FallbackImage'; // FallbackImage 컴포넌트 임포트
 
 // Define props for wrapper icons like PistolIcon
 interface WeaponIconWrapperProps {
   className?: string;
+  alt: string; // alt 속성을 필수로 추가
   style?: React.CSSProperties;
 }
 
@@ -22,8 +18,6 @@ export const TacticalLoader: React.FC<{ className?: string, text?: string }> = (
   <div className={`relative bg-gray-950 overflow-hidden border border-green-900/50 ${className}`}>
      {/* Grid Background */}
      <div className="absolute inset-0 bg-[linear-gradient(rgba(0,50,0,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(0,50,0,0.1)_1px,transparent_1px)] bg-[size:20px_20px]"></div>
-
-     {/* Full Vertical Scan Animation - 이 라인은 App.tsx로 이동하여 항상 표시되도록 수정되었습니다. */}
 
      {/* Text */}
      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 text-green-500 text-[10px] md:text-xs font-bold tracking-widest animate-pulse flex flex-col items-center gap-1">
@@ -39,8 +33,6 @@ export const WeaponLoader: React.FC<{ className?: string }> = ({ className }) =>
   <div className={`relative bg-gray-900 flex items-center justify-center overflow-hidden ${className}`}>
      {/* Fine Grid Background */}
      <div className="absolute inset-0 bg-[linear-gradient(rgba(34,197,94,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(34,197,94,0.05)_1px,transparent_1px)] bg-[size:10px_10px]"></div>
-
-     {/* Full Vertical Scan Animation - 이 라인은 App.tsx로 이동하여 항상 표시되도록 수정되었습니다. */}
 
      {/* Central Reticle / HUD Element */}
      <div className="z-10 relative flex flex-col items-center justify-center opacity-30">
@@ -60,11 +52,9 @@ export const WeaponLoader: React.FC<{ className?: string }> = ({ className }) =>
 );
 
 // PNG 로드 실패 시 보여줄 벡터(SVG) 아이콘 - M1911
-// `export` 키워드를 추가하여 이 컴포넌트가 다른 파일에서 import 될 수 있도록 합니다.
 export const M1911Vector: React.FC<WeaponIconWrapperProps> = ({ className }) => (
   <svg viewBox="0 0 200 120" className={className} xmlns="http://www.w3.org/2000/svg">
     <defs>
-      {/* SVG linearGradient의 x2, y2 속성 값 형식을 수정합니다. */}
       <linearGradient id="slideGradient" x1="0%" y1="0%" x2="0%" y2="100%">
         <stop offset="0%" stopColor="#c8c8c8" />
         <stop offset="50%" stopColor="#8c8c8c" />
@@ -178,95 +168,96 @@ export const ShotgunVector: React.FC<WeaponIconWrapperProps> = ({ className }) =
 );
 
 
-// 이미지 경로가 없을 경우를 대비하여 폴백 처리하는 헬퍼 컴포넌트입니다.
-// 이 컴포넌트 자체도 외부에 노출되어야 하므로 `export` 합니다.
-export const WeaponIcon: React.FC<WeaponIconProps> = ({ imagePaths, fallback, className, alt, style }) => {
-  const [currentPathIndex, setCurrentPathIndex] = useState(0);
-  const [useFallback, setUseFallback] = useState(false);
-  const [isLoaded, setIsLoaded] = useState(false);
+// [NEW] SVG 폴백을 처리하기 위한 새로운 WeaponIcon 래퍼 컴포넌트
+interface WeaponIconProps {
+  imagePaths: string[];
+  // FIX: `React.cloneElement`가 `fallback` 요소의 prop 타입을 올바르게 추론할 수 있도록,
+  // `React.ReactElement`에 제네릭 타입 `WeaponIconWrapperProps`를 명시합니다.
+  // 이로써 `cloneElement`에 `className`과 `style`을 전달할 때 발생하는 타입 오류를 해결합니다.
+  fallback: React.ReactElement<WeaponIconWrapperProps>; // SVG 컴포넌트
+  className?: string;
+  alt: string;
+  style?: React.CSSProperties;
+  onLoad?: () => void; // onLoad 프롭 추가
+}
 
+const WeaponIcon: React.FC<WeaponIconProps> = ({ imagePaths, fallback, className, alt, style, onLoad }) => {
+  const [imageFailed, setImageFailed] = useState(false);
+
+  // imagePaths가 변경되면 실패 상태를 초기화합니다.
+  useEffect(() => {
+    setImageFailed(false);
+  }, [imagePaths]);
+
+  // FallbackImage의 모든 소스 로드에 실패하면 호출됩니다.
   const handleError = () => {
-    if (currentPathIndex < imagePaths.length - 1) {
-      // 다음 경로 시도
-      setCurrentPathIndex(prev => prev + 1);
-      setIsLoaded(false); // 이미지 로딩 상태 초기화
-    } else {
-      // 모든 경로 실패, 폴백 사용
-      setUseFallback(true);
-    }
+    setImageFailed(true);
   };
 
-  const handleLoad = () => setIsLoaded(true);
-
-  if (useFallback) {
-    return <>{fallback}</>;
+  // 이미지 로드 실패 시, SVG 폴백을 렌더링합니다.
+  if (imageFailed) {
+    // React.cloneElement를 사용하여 fallback 컴포넌트에 props를 전달합니다.
+    return React.cloneElement(fallback, { className, style });
   }
 
-  // 이미지 경로가 비어있는 경우 즉시 폴백 사용
-  if (!imagePaths || imagePaths.length === 0) {
-      // 이 부분은 React 렌더링 사이클 외부에서 상태를 업데이트하므로,
-      // `useEffect`로 래핑하거나 초기 렌더링 시점에만 검사하는 것이 더 안전합니다.
-      // 현재는 렌더링 도중 상태 업데이트가 발생할 수 있어 주의가 필요하지만,
-      // 대부분의 경우 `imagePaths`가 props로 바로 전달되어 초기화되므로 큰 문제는 없습니다.
-      setUseFallback(true);
-      return <>{fallback}</>;
-  }
-
+  // 성공 시, FallbackImage를 렌더링합니다.
   return (
-    <div style={style} className={`relative flex items-center justify-center overflow-hidden ${className}`}>
-      <img
-        key={imagePaths[currentPathIndex]} // key를 변경하여 React가 새로운 img 요소를 마운트하도록 함
-        src={imagePaths[currentPathIndex]}
-        alt={alt}
-        className={`w-full h-full object-contain drop-shadow-[0_4px_6px_rgba(0,0,0,0.5)] transition-opacity duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
-        draggable={false}
-        onError={handleError}
-        onLoad={handleLoad}
-      />
-    </div>
+    <FallbackImage
+      srcs={imagePaths}
+      alt={alt}
+      className={className}
+      style={style}
+      draggable={false}
+      onError={handleError}
+      onLoad={onLoad} // 부모로부터 받은 onLoad를 전달
+    />
   );
 };
 
 // PistolIcon 컴포넌트를 `export`합니다.
-export const PistolIcon: React.FC<WeaponIconWrapperProps> = ({ className, style }) => (
+export const PistolIcon: React.FC<WeaponIconWrapperProps> = ({ className, style, alt, ...rest }) => (
     <WeaponIcon 
-      imagePaths={['https://storage.cloud.google.com/kaelove_game_01/Gemini_Generated_m1911.png', '/m1911.png', 'm1911.png']} 
-      fallback={<M1911Vector className={className} />} 
+      imagePaths={ASSETS.WEAPON_M1911}
+      fallback={<M1911Vector className={className} alt={alt} {...rest}/>}
       className={className} 
-      alt={GAME_TEXT.WEAPONS.M1911.NAME} 
-      style={style} 
+      alt={alt} 
+      style={style}
+      {...rest}
     />
 );
 
 // MP5Icon 컴포넌트를 `export`합니다.
-export const MP5Icon: React.FC<WeaponIconWrapperProps> = ({ className, style }) => (
+export const MP5Icon: React.FC<WeaponIconWrapperProps> = ({ className, style, alt, ...rest }) => (
     <WeaponIcon 
-      imagePaths={['https://storage.cloud.google.com/kaelove_game_01/Gemini_Generated_mp5.png', '/mp5.png', 'mp5.png']} 
-      fallback={<MP5Vector className={className} />} 
+      imagePaths={ASSETS.WEAPON_MP5}
+      fallback={<MP5Vector className={className} alt={alt} {...rest}/>}
       className={className} 
-      alt={GAME_TEXT.WEAPONS.MP5.NAME} 
-      style={style} 
+      alt={alt} 
+      style={style}
+      {...rest}
     />
 );
 
 // RifleIcon 컴포넌트를 `export`합니다.
-export const RifleIcon: React.FC<WeaponIconWrapperProps> = ({ className, style }) => (
+export const RifleIcon: React.FC<WeaponIconWrapperProps> = ({ className, style, alt, ...rest }) => (
     <WeaponIcon 
-      imagePaths={['https://storage.cloud.google.com/kaelove_game_01/bunny_Rifle.png', '/bunny_Rifle.png', 'bunny_Rifle.png']} 
-      fallback={<RifleVector className={className} />} 
+      imagePaths={ASSETS.WEAPON_RIFLE}
+      fallback={<RifleVector className={className} alt={alt} {...rest}/>}
       className={className} 
-      alt={GAME_TEXT.WEAPONS.RIFLE.NAME} 
-      style={style} 
+      alt={alt} 
+      style={style}
+      {...rest}
     />
 );
 
 // ShotgunIcon 컴포넌트를 `export`합니다.
-export const ShotgunIcon: React.FC<WeaponIconWrapperProps> = ({ className, style }) => (
+export const ShotgunIcon: React.FC<WeaponIconWrapperProps> = ({ className, style, alt, ...rest }) => (
     <WeaponIcon 
-      imagePaths={['https://storage.cloud.google.com/kaelove_game_01/Gemini_Generated_Shotgun.png']} 
-      fallback={<ShotgunVector className={className} />} 
+      imagePaths={ASSETS.WEAPON_SHOTGUN}
+      fallback={<ShotgunVector className={className} alt={alt} {...rest}/>}
       className={className} 
-      alt={GAME_TEXT.WEAPONS.SHOTGUN.NAME} 
-      style={style} 
+      alt={alt} 
+      style={style}
+      {...rest}
     />
 );

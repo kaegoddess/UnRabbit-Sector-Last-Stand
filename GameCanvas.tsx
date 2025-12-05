@@ -1,11 +1,9 @@
 
-
 import React, { useRef, useEffect, useCallback } from 'react';
 import { Player, Zombie, Bullet, Particle, Shell, FloatingText, GameStatus, WeaponPart, UpgradeState, Item, ItemType, GameStats } from '../types';
 import { GAME_SETTINGS, SOUND_SETTINGS, FLOATING_TEXT, RENDER_SETTINGS } from '../config/gameConfig';
 import { ZOMBIE_STATS } from '../config/zombieConfig';
-// FIX: PLAYER_LEVELING_SETTINGS를 import하여 레벨업 관련 설정을 사용합니다.
-import { PLAYER_STATS, PLAYER_UI_SETTINGS, PLAYER_EFFECTS, PLAYER_LEVELING_SETTINGS } from '../config/playerConfig';
+import { PLAYER_STATS, PLAYER_UI_SETTINGS, PLAYER_EFFECTS, PLAYER_LEVELING_SETTINGS } from '../config/playerConfig'; // [수정] PLAYER_LEVELING_SETTINGS 임포트
 import { WEAPONS } from '../config/weaponConfig';
 import { soundService } from '../services/SoundService';
 import { GAME_TEXT } from '../config/textConfig';
@@ -64,8 +62,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
     totalReloadTime: 0,
     score: 0,
     xp: 0,
-    // FIX: 하드코딩된 '100' 대신 설정 파일의 'baseMaxXp' 값을 사용하여 초기 필요 경험치를 설정합니다.
-    maxXp: PLAYER_LEVELING_SETTINGS.baseMaxXp, // Level 1 XP
+    maxXp: PLAYER_LEVELING_SETTINGS.baseMaxXp, // [수정] 초기 필요 경험치 설정
     level: 1,
 
     // [FIX] Player 타입에 정의된 스테미나 및 닷지 관련 속성들이 누락되어 발생하는 타입 오류를 수정합니다.
@@ -391,8 +388,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
       totalReloadTime: 0,
       score: 0,
       xp: 0,
-      // FIX: 하드코딩된 '100' 대신 설정 파일의 'baseMaxXp' 값을 사용하여 초기 필요 경험치를 설정합니다.
-      maxXp: PLAYER_LEVELING_SETTINGS.baseMaxXp,
+      maxXp: PLAYER_LEVELING_SETTINGS.baseMaxXp, // [수정] 초기 필요 경험치 설정
       level: 1,
 
       // [FIX] Player 타입에 정의된 스테미나 및 닷지 관련 속성들이 누락되어 발생하는 타입 오류를 수정합니다.
@@ -483,8 +479,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
               if (player.xp >= player.maxXp) {
                   player.level++;
                   player.xp -= player.maxXp;
-                  // FIX: 하드코딩된 '1.2' 대신 설정 파일의 'xpMultiplierPerLevel' 값을 사용하여 다음 레벨 필요 경험치를 계산합니다.
-                  player.maxXp = Math.floor(player.maxXp * PLAYER_LEVELING_SETTINGS.xpMultiplierPerLevel);
+                  player.maxXp = Math.floor(player.maxXp * PLAYER_LEVELING_SETTINGS.xpMultiplierPerLevel); // [수정] 경험치 증가율 적용
                   setGameStatus(GameStatus.LEVEL_UP);
               }
           }
@@ -901,8 +896,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
       hitTimer: 0,
       slowTimer: 0,
       slowFactor: 1.0,
-      xp: stats.xp || 10, // 경험치
-      // [NEW] 넉백 상태 초기화
+      xp: stats.xp || 10, // 처치 시 획득 경험치
+      // [NEW] 부드러운 넉백 효과를 위한 상태 변수
+      // 넉백 시 적용될 속도 벡터입니다. {x, y} 형태로 저장됩니다.
       knockbackVelocity: { x: 0, y: 0 },
       knockbackTimer: 0,
     });
@@ -1582,8 +1578,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
             if (player.xp >= player.maxXp) {
                 player.level++;
                 player.xp -= player.maxXp;
-                // FIX: 하드코딩된 '1.2' 대신 설정 파일의 'xpMultiplierPerLevel' 값을 사용하여 다음 레벨 필요 경험치를 계산합니다.
-                player.maxXp = Math.floor(player.maxXp * PLAYER_LEVELING_SETTINGS.xpMultiplierPerLevel); // 필요 경험치 20% 증가
+                player.maxXp = Math.floor(player.maxXp * PLAYER_LEVELING_SETTINGS.xpMultiplierPerLevel); // [수정] 경험치 증가율 적용
                 setGameStatus(GameStatus.LEVEL_UP);
             }
 
