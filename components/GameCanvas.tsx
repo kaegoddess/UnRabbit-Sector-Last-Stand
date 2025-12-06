@@ -1,5 +1,3 @@
-
-
 import React, { useRef, useEffect, useCallback } from 'react';
 import { Player, Zombie, Bullet, Particle, Shell, FloatingText, GameStatus, WeaponPart, UpgradeState, Item, ItemType, GameStats } from '../types';
 import { GAME_SETTINGS, SOUND_SETTINGS, FLOATING_TEXT, RENDER_SETTINGS } from '../config/gameConfig';
@@ -702,7 +700,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameStatus, selectedWeaponId, u
 
     if (now - lastShotTimeRef.current < effectiveStats.fireRate) return;
 
-    soundService.play('shoot');
+    // [수정] 범용 'shoot' 사운드 대신, 현재 무기에 지정된 고유 발사음을 재생합니다.
+    // `effectiveStats.soundFire`는 'shoot_pistol', 'shoot_mp5' 등의 문자열 값을 가집니다.
+    // soundService.play() 메서드는 이 키를 받아와 올바른 사운드를 재생합니다.
+    // 타입 단언(as any)은 effectiveStats가 동적 객체이므로 TypeScript가 타입을 확신할 수 없을 때 사용합니다.
+    soundService.play(effectiveStats.soundFire as any);
 
     if (currentWeapon.screenShake) {
       screenShakeRef.current = {

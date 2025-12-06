@@ -21,14 +21,14 @@ export const ZOMBIE_STATS = {
       dropChanceMultiplier: 1, // 아이템 드랍 확률 배율 (기본)
     },
     runner: {
-      speed: 240, 
+      speed: 200, 
       speedVariance: 10,
       baseHealth: 10,
       radius: 12,
       color: '#ef4444', // Red
-      damage: 20,
+      damage: 10,
       score: 20,
-      xp: 2,
+      xp: 10,
       minWave: 5, // 5웨이브부터 등장
       chance: 0.2, // 스폰 확률 (20%)
       dropChanceMultiplier: 1.2, // 아이템 드랍 확률 1.2배
@@ -41,7 +41,7 @@ export const ZOMBIE_STATS = {
       color: '#7f1d1d', // Dark Red
       damage: 30,
       score: 50,
-      xp: 10,
+      xp: 100,
       minWave: 10, // 10웨이브부터 등장
       chance: 0.05, // 스폰 확률 (5%)
       dropChanceMultiplier: 2.0, // 아이템 드랍 확률 2배

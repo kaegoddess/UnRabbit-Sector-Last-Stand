@@ -1,42 +1,49 @@
-
 // 게임 밸런스 및 설정을 위한 데이터베이스 (시스템, 사운드 등)
 // 좀비 설정은 zombieConfig.ts, 무기 설정은 weaponConfig.ts, 플레이어 설정은 playerConfig.ts 참조
 
 // 게임 버전
-export const GAME_VERSION = "0.55";
+export const GAME_VERSION = "0.56";
 
 // 거리 단위: 픽셀(px)
 // 시간 단위: 밀리초(ms) 또는 초(s)
 
 // 사운드 설정
 export const SOUND_SETTINGS = {
-  masterVolume: 3,
+  // masterVolume: 1.0이 100% 볼륨입니다. 이 값을 줄이면 모든 사운드가 작아집니다. (예: 0.5 = 50% 볼륨)
+  masterVolume: 1.0, 
   footstepInterval: 350, // 발소리 간격 (ms) - 걷는 리듬에 맞춰 조정
   
-  // [NEW] 전력질주 충돌음 재생 최소 간격 (ms)
+  // 전력질주 충돌음 재생 최소 간격 (ms)
   // 이 시간 내에는 충돌음이 한 번만 재생되어 사운드 왜곡을 방지합니다.
-  // 예: 200ms로 설정하면, 0.2초 안에 여러 마리와 부딪쳐도 소리는 한 번만 납니다.
   sprintCollideCooldown: 200,
 
-  // 프로젝트 빌드 시 포함할 사운드 파일 경로를 지정합니다.
-  // 이 파일들은 프로젝트의 public/sound 폴더 안에 있어야 합니다.
-  // 파일이 없으면 자동으로 내장 신디사이저(합성음)가 작동합니다.
+  // 각 사운드 파일 경로와 개별 볼륨을 설정합니다.
+  // volume: 1.0이 기본값이며, 0.5는 50% 크기, 2.0은 200% 크기로 재생됩니다.
+  // 최종 재생 볼륨 = masterVolume * 개별 volume 값.
+  // src: 'sound/' 폴더 내의 사운드 파일 경로. 파일이 없으면 자동으로 합성음이 재생됩니다.
   assets: {
-    shoot: 'sound/shoot.mp3', 
-    impact: 'sound/impact.mp3', 
-    footstep: 'sound/footstep.mp3',
-    reload: 'sound/reload.mp3', 
-    playerHit: 'sound/player_hit.mp3',
-    itemPickup: 'sound/pickup.mp3', // 아이템 획득 사운드 파일 경로
-    uiSelect: 'sound/ui_select.mp3', // UI 선택 효과음. 파일이 없으므로 합성음이 재생됩니다.
-    // 빠른 재장전 사운드
-    quickReloadSuccess: 'sound/quick_reload_success.mp3', 
-    quickReloadFail: 'sound/quick_reload_fail.mp3',
-    // [NEW] 닷지 및 전력질주 사운드
-    dodge: 'sound/dodge.mp3',
-    dodgeLand: 'sound/dodge_land.mp3',
-    sprintCollide: 'sound/sprint_collide.mp3',
-    staminaEmpty: 'sound/stamina_empty.mp3', // 스테미나 부족 경고음
+    shoot_pistol: { src: 'sound/shoot_pistol.mp3', volume: 0.7 },
+    shoot_mp5:    { src: 'sound/shoot_mp5.mp3',    volume: 0.5 },
+    shoot_rifle:  { src: 'sound/shoot_rifle.mp3',  volume: 0.7 },
+    shoot_shotgun:{ src: 'sound/shoot_shotgun.mp3', volume: 0.4 },
+    
+    impact:    { src: 'sound/impact.mp3',    volume: 0.8 }, 
+    footstep:  { src: 'sound/footstep.mp3',  volume: 0.4 },
+    reload:    { src: 'sound/reload.mp3',    volume: 0.8 }, 
+    playerHit: { src: 'sound/player_hit.mp3', volume: 0.9 },
+    itemPickup:{ src: 'sound/pickup.mp3',    volume: 0.7 },
+    uiSelect:  { src: 'sound/ui_select.mp3', volume: 0.5 },
+    
+    quickReloadSuccess: { src: 'sound/quick_reload_success.mp3', volume: 0.8 }, 
+    quickReloadFail:    { src: 'sound/quick_reload_fail.mp3',    volume: 0.8 },
+    
+    dodge:         { src: 'sound/dodge.mp3',         volume: 1 },
+    dodgeLand:     { src: 'sound/dodge_land.mp3',    volume: 0.7 },
+    sprintCollide: { src: 'sound/sprint_collide.mp3',volume: 0.7 },
+    staminaEmpty:  { src: 'sound/stamina_empty.mp3', volume: 0.5 },
+
+    shellLoad: { src: 'sound/shell_load.mp3', volume: 0.6 },
+    dryFire:   { src: 'sound/dry_fire.mp3',   volume: 0.7 },
   }
 };
 

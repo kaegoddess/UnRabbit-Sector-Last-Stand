@@ -1,4 +1,3 @@
-
 // weaponDb.ts
 // 이 파일은 모든 무기의 상세 능력치를 관리하는 중앙 데이터베이스입니다.
 // 무기 스탯을 수정하거나 새로운 무기를 추가하고 싶다면, 이 파일만 수정하면 됩니다.
@@ -73,6 +72,7 @@ export const WEAPON_DATABASE = {
     bullet: { bulletSpeed: 1000, bulletRadius: 3, bulletColor: '#fbbf24', maxDistance: 350 },
     handling: { minSpread: 0.05, maxSpread: 0.3, recoilControl: 4, recoilResetTime: 250, maxSpreadMoving: 0.6, movementStability: 5, aimDelay: 0.10, gunRecoil: 20, recoilRecovery: 10, maxAmmo: 8, reloadTime: 1200, reloadType: 'magazine', reloadMethod: 'auto', quickReloadMinTimePercent: 0.45, quickReloadMaxTimePercent: 0.8, quickReloadDifficultyPercent: 0.2 },
     visuals: {
+      soundFire: 'shoot_pistol', // [추가] 권총 발사음 키
       upgradeImage: ASSETS.WEAPON_M1911, // [추가] 업그레이드 화면용 이미지
       menuIconScale: 1.5, hudIconScale: 2, upgradeImageScale: 0.5,
       ammoUi: { layout: 'single', bulletWidth: 10, bulletHeight: 24, gap: 4 },
@@ -92,6 +92,7 @@ export const WEAPON_DATABASE = {
     bullet: { bulletSpeed: 1200, bulletRadius: 3, bulletColor: '#fde047', maxDistance: 300 },
     handling: { minSpread: 0.05, maxSpread: 0.4, recoilControl: 10, recoilResetTime: 250, maxSpreadMoving: 0.8, movementStability: 5, aimDelay: 0.2, gunRecoil: 5, recoilRecovery: 40, maxAmmo: 30, reloadTime: 1500, reloadType: 'magazine', reloadMethod: 'auto', quickReloadMinTimePercent: 0.4, quickReloadMaxTimePercent: 0.7, quickReloadDifficultyPercent: 0.10 },
     visuals: {
+      soundFire: 'shoot_mp5', // [추가] MP5 발사음 키
       upgradeImage: ASSETS.WEAPON_MP5, // [추가] 업그레이드 화면용 이미지
       menuIconScale: 1.4, hudIconScale: 2, upgradeImageScale: 0.5,
       ammoUi: { layout: 'double', bulletWidth: 8, bulletHeight: 20, gap: 3 },
@@ -111,6 +112,7 @@ export const WEAPON_DATABASE = {
     bullet: { bulletSpeed: 1500, bulletRadius: 6, bulletColor: '#ffedd5', maxDistance: 400 },
     handling: { minSpread: 0.01, maxSpread: 0.6, recoilControl: 2, recoilResetTime: 150, maxSpreadMoving: 1, movementStability: 1, aimDelay: 0.25, gunRecoil: 35, recoilRecovery: 5, maxAmmo: 5, reloadTime: 2500, reloadType: 'magazine', reloadMethod: 'auto', quickReloadMinTimePercent: 0.5, quickReloadMaxTimePercent: 0.7, quickReloadDifficultyPercent: 0.1 },
     visuals: {
+      soundFire: 'shoot_rifle', // [추가] 라이플 발사음 키
       upgradeImage: ASSETS.WEAPON_RIFLE, // [추가] 업그레이드 화면용 이미지
       menuIconScale: 1.4, hudIconScale: 2, upgradeImageScale: 0.5,
       ammoUi: { layout: 'single', bulletWidth: 12, bulletHeight: 32, gap: 6 },
@@ -130,6 +132,7 @@ export const WEAPON_DATABASE = {
     bullet: { bulletSpeed: 900, bulletRadius: 2, bulletColor: '#fef3c7', maxDistance: 300 },
     handling: { minSpread: 0.4, maxSpread: 0.8, recoilControl: 2, recoilResetTime: 100, maxSpreadMoving: 1.2, movementStability: 1.5, aimDelay: 0.15, gunRecoil: 25, recoilRecovery: 5, maxAmmo: 6, reloadTime: 500, reloadType: 'shell', reloadMethod: 'manual', quickReloadMinTimePercent: 0.5, quickReloadMaxTimePercent: 0.8, quickReloadDifficultyPercent: 0.30 },
     visuals: {
+      soundFire: 'shoot_shotgun', // [추가] 샷건 발사음 키
       upgradeImage: ASSETS.WEAPON_SHOTGUN, // [추가] 업그레이드 화면용 이미지
       menuIconScale: 1.4, hudIconScale: 2, upgradeImageScale: 0.5,
       ammoUi: { layout: 'single', bulletWidth: 14, bulletHeight: 26, gap: 5 },
