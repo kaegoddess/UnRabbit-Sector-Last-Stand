@@ -27,7 +27,7 @@ export const PLAYER_STATS = {
 
   // [NEW] 닷지(Dodge) 시스템 설정
   dodgeStaminaCost: 20, // 닷지 1회당 스테미나 소모량 (게이지 한 칸)
-  dodgeSpeedMultiplier: 2.5, // 닷지 시 이동 속도 배율 (순간적으로 200% 빨라짐)
+  dodgeSpeedMultiplier: 5.0, // 닷지 시 이동 속도 배율 (순간적으로 200% 빨라짐)
   dodgeDuration: 0.4, // 닷지 총 지속 시간 (초)
   dodgeInvulnerabilityStartTime: 0.05, // 닷지 시작 후 무적 상태가 되기까지 걸리는 시간 (초)
   dodgeInvulnerabilityDuration: 0.25, // 무적 지속 시간 (초)
