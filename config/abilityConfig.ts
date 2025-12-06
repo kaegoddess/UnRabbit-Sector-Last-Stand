@@ -5,9 +5,9 @@
 export const GRENADE_STATS = {
     // --- 레벨업 및 성장 ---
     // 기본 데미지. 이 값에 레벨당 데미지가 추가됩니다.
-    baseDamage: 50,
+    baseDamage: 20,
     // 레벨당 증가하는 데미지.
-    damagePerLevel: 10,
+    damagePerLevel: 5,
     // 기본 폭발 반경 (픽셀 단위).
     baseRadius: 100,
     // 레벨당 증가하는 폭발 반경.
@@ -37,13 +37,13 @@ export const GRENADE_STATS = {
     // 던지는 초기 속도 (수직, 점프 높이).
     throwVerticalVelocity: 250,
     // 수류탄에 적용되는 중력.
-    gravity: 800,
+    gravity: 500,
     // 바닥에 튕기는 정도 (0.0 ~ 1.0).
-    bounciness: 0.4,
+    bounciness: 0.5,
     // 바닥에 떨어진 후 구르다가 터지기까지 걸리는 시간 (초).
-    rollDuration: 1.5,
+    rollDuration: 1,
     // 수평 속도 감쇠 (구를 때 마찰력). 1.0이면 감속 없음.
-    friction: 0.5, 
+    friction: 0.1, 
 
     // --- 시각 효과 ---
     // 폭발 이펙트 지속 시간 (초).

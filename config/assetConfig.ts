@@ -25,7 +25,7 @@ export const ASSETS = {
   // UI 및 배경
   LOADING_SCREEN: ["https://storage.cloud.google.com/kaelove_game_01/Gemini_Generated_loding01.png", `${IMG_PATH}Gemini_Generated_loding01.png`],
   // [NEW] 수류탄 아이콘 추가
-  ICON_GRENADE: ["https://storage.cloud.google.com/kaelove_game_01/icon_grenade.png", `${IMG_PATH}icon_grenade.png`],
+  ICON_GRENADE: ["https://storage.cloud.google.com/kaelove_game_01/Gemini_Generated_icon_grenade.png", `${IMG_PATH}icon_grenade.png`],
 
   // 업그레이드 아이콘
   UPGRADE_ICON_SCOPE: ["https://storage.cloud.google.com/kaelove_game_01/up_1.png", `${IMG_PATH}up_1.png`],
