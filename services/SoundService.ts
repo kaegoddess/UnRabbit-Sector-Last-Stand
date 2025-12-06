@@ -204,6 +204,9 @@ class SoundService {
       case 'staminaEmpty': this.synthStaminaEmpty(volume); break;
       case 'shellLoad': this.synthShellLoad(volume); break;
       case 'dryFire': this.synthDryFire(volume); break;
+      // [NEW] 수류탄 합성음 추가
+      case 'grenadeThrow': this.synthGrenadeThrow(volume); break;
+      case 'grenadeExplode': this.synthGrenadeExplode(volume); break;
     }
   }
 
@@ -228,6 +231,91 @@ class SoundService {
 
   // --- 신디사이저 (합성음) 로직 ---
   // [수정] 모든 synth... 메서드가 볼륨 값을 인자로 받도록 수정합니다.
+
+  private synthGrenadeThrow(volume: number) {
+    if (!this.context) return;
+    const t = this.context.currentTime;
+    const vol = SOUND_SETTINGS.masterVolume * volume * 0.6;
+    const bufferSize = this.context.sampleRate * 0.2;
+    const buffer = this.context.createBuffer(1, bufferSize, this.context.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    
+    const noise = this.context.createBufferSource();
+    noise.buffer = buffer;
+
+    const filter = this.context.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.Q.value = 8;
+    filter.frequency.setValueAtTime(1000, t);
+    filter.frequency.exponentialRampToValueAtTime(4000, t + 0.15);
+
+    const gain = this.context.createGain();
+    gain.gain.setValueAtTime(vol, t);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.context.destination);
+    noise.start(t);
+  }
+
+  private synthGrenadeExplode(volume: number) {
+      if (!this.context) return;
+      const t = this.context.currentTime;
+      const vol = SOUND_SETTINGS.masterVolume * volume;
+
+      // Low-frequency boom
+      const boomOsc = this.context.createOscillator();
+      boomOsc.type = 'sine';
+      boomOsc.frequency.setValueAtTime(120, t);
+      boomOsc.frequency.exponentialRampToValueAtTime(30, t + 0.5);
+      const boomGain = this.context.createGain();
+      boomGain.gain.setValueAtTime(vol * 1.5, t);
+      boomGain.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
+      boomOsc.connect(boomGain);
+      boomGain.connect(this.context.destination);
+      boomOsc.start(t);
+      boomOsc.stop(t + 0.6);
+
+      // White noise for the crackle/hiss
+      const bufferSize = this.context.sampleRate * 0.8;
+      const buffer = this.context.createBuffer(1, bufferSize, this.context.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+      
+      const noise = this.context.createBufferSource();
+      noise.buffer = buffer;
+      const noiseFilter = this.context.createBiquadFilter();
+      noiseFilter.type = 'lowpass';
+      noiseFilter.frequency.setValueAtTime(8000, t);
+      noiseFilter.frequency.exponentialRampToValueAtTime(200, t + 0.8);
+      
+      const noiseGain = this.context.createGain();
+      noiseGain.gain.setValueAtTime(vol * 0.8, t);
+      noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.8);
+
+      noise.connect(noiseFilter);
+      noiseFilter.connect(noiseGain);
+      noiseGain.connect(this.context.destination);
+      noise.start(t);
+
+      // Distortion for a grittier sound
+      const distortion = this.context.createWaveShaper();
+      const k = 200;
+      const n_samples = 44100;
+      const curve = new Float32Array(n_samples);
+      const deg = Math.PI / 180;
+      for (let i = 0; i < n_samples; ++i ) {
+          const x = i * 2 / n_samples - 1;
+          curve[i] = ( 3 + k ) * x * 20 * deg / ( Math.PI + k * Math.abs(x) );
+      }
+      distortion.curve = curve;
+      distortion.oversample = '4x';
+      
+      boomGain.connect(distortion);
+      distortion.connect(this.context.destination);
+  }
 
   private synthDryFire(volume: number) {
     if (!this.context) return;

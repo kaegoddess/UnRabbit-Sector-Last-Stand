@@ -1,4 +1,5 @@
 
+
 // 플레이어 관련 설정
 
 export const PLAYER_STATS = {
@@ -115,6 +116,17 @@ export const PLAYER_HUD_SETTINGS = {
   bottom: '0.9rem',
   // 초상화 컨테이너의 전체 너비
   width: '20rem',
+};
+
+// [NEW] 인게임 HUD에 표시되는 수류탄 아이콘의 위치와 크기입니다.
+// 개발자 모드에서 실시간으로 조정하고 이 값을 업데이트할 수 있습니다.
+export const GRENADE_UI_SETTINGS = {
+  // 화면 오른쪽 가장자리에서의 거리
+  right: '65rem',
+  // 화면 아래쪽 가장자리에서의 거리
+  bottom: '1.5rem',
+  // 아이콘의 크기 (가로, 세로 동일)
+  size: '7rem',
 };
 
 // 게임 오버 화면에 표시되는 '임무 실패' 캐릭터 이미지의 위치와 크기입니다.

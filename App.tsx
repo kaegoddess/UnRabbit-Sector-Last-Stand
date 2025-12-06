@@ -1,16 +1,19 @@
 
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import GameCanvas from './components/GameCanvas';
 import { GameStatus, WeaponPart, UpgradeState } from './types';
-import { PLAYER_STATS, PLAYER_HUD_SETTINGS, GAME_OVER_UI_SETTINGS, PLAYER_LEVELING_SETTINGS } from './config/playerConfig';
+import { PLAYER_STATS, PLAYER_HUD_SETTINGS, GAME_OVER_UI_SETTINGS, PLAYER_LEVELING_SETTINGS, GRENADE_UI_SETTINGS } from './config/playerConfig';
 import { WEAPONS } from './config/weaponConfig';
-import { PistolIcon, MP5Icon, RifleIcon, ShotgunIcon, TacticalLoader, WeaponLoader } from './components/GameIcons';
+import { PistolIcon, MP5Icon, RifleIcon, ShotgunIcon, TacticalLoader, WeaponLoader, GrenadeIcon } from './components/GameIcons';
 import { soundService } from './services/SoundService';
 import { GAME_TEXT } from './config/textConfig';
 import { UPGRADE_CONFIG } from './config/upgradeConfig';
 import { GAME_VERSION } from './config/gameConfig';
 import { ASSETS } from './config/assetConfig'; // 중앙 에셋 설정 파일 임포트
 import FallbackImage from './components/FallbackImage';
+import { GRENADE_STATS } from './config/abilityConfig';
+
 
 interface UICasing {
   id: string;
@@ -68,44 +71,52 @@ const App: React.FC = () => {
   const [stats, setStats] = useState({ 
     health: PLAYER_STATS.maxHealth, 
     ammo: WEAPONS[selectedWeaponKey].maxAmmo,
-    // GameCanvas에서 계산된 업그레이드가 적용된 최대 탄약. UI 표시에 사용됩니다.
     maxAmmo: WEAPONS[selectedWeaponKey].maxAmmo, 
     score: 0, 
     wave: 1,
     xp: 0,
-    maxXp: PLAYER_LEVELING_SETTINGS.baseMaxXp, // 초기 필요 경험치 설정
+    maxXp: PLAYER_LEVELING_SETTINGS.baseMaxXp,
     level: 1,
     stamina: PLAYER_STATS.maxStamina,
     maxStamina: PLAYER_STATS.maxStamina,
+    grenadeCooldown: 0,
+    maxGrenadeCooldown: GRENADE_STATS.baseCooldown,
   });
   const [missionText, setMissionText] = useState<string>("Initializing secure link...");
   const [gameOverText, setGameOverText] = useState<string>("");
   const [finalReport, setFinalReport] = useState<{score: number, kills: number, wave: number} | null>(null);
   
-  // [수정] 이미지 로딩 상태를 관리하는 객체입니다. 'char-Pistol', 'weapon-MP5' 와 같은 키로 로딩 상태를 저장합니다.
   const [imageLoadStatus, setImageLoadStatus] = useState<Record<string, boolean>>({});
 
-  // 무기 업그레이드 3D 틸트 효과를 위한 상태
   const [hoveredPart, setHoveredPart] = useState<WeaponPart | null>(null);
 
-  // [NEW] 탄약 부족 경고 효과를 위한 상태
   const [isAmmoWarning, setIsAmmoWarning] = useState(false);
 
   // --- 개발자 모드 ---
+  // [NEW] 게임 플레이 중 활성화되는 개발자 모드 상태 (순환: none -> hud -> grenade)
+  const [playingDevMode, setPlayingDevMode] = useState<'none' | 'hud' | 'grenade'>('none');
+  
+  // 업그레이드 화면 개발자 모드
   const [isUpgradeDevMode, setIsUpgradeDevMode] = useState(false);
   const [devUpgradePositions, setDevUpgradePositions] = useState(WEAPONS[selectedWeaponKey].upgradePositions);
   const [devCharPosition, setDevCharPosition] = useState(WEAPONS[selectedWeaponKey].characterPosition);
   const [devInputValues, setDevInputValues] = useState<any>({});
 
-  // --- HUD 개발자 모드 ---
-  const [isHudDevMode, setIsHudDevMode] = useState(false);
+  // HUD 위치 조정용 개발자 모드 상태
   const [hudDevSettings, setHudDevSettings] = useState({
       right: parseFloat(PLAYER_HUD_SETTINGS.right),
       bottom: parseFloat(PLAYER_HUD_SETTINGS.bottom),
       width: parseFloat(PLAYER_HUD_SETTINGS.width),
   });
   
-  // --- 게임오버 UI 개발자 모드 ---
+  // [NEW] 수류탄 UI 위치 조정용 개발자 모드 상태
+  const [grenadeUiDevSettings, setGrenadeUiDevSettings] = useState({
+      right: parseFloat(GRENADE_UI_SETTINGS.right),
+      bottom: parseFloat(GRENADE_UI_SETTINGS.bottom),
+      size: parseFloat(GRENADE_UI_SETTINGS.size),
+  });
+
+  // 게임오버 UI 개발자 모드
   const [isGameOverDevMode, setIsGameOverDevMode] = useState(false);
   const [gameOverDevSettings, setGameOverDevSettings] = useState({
       width: parseFloat(GAME_OVER_UI_SETTINGS.imageWidth),
@@ -119,14 +130,11 @@ const App: React.FC = () => {
   const requestRef = useRef<number>(0);
   const prevTimeRef = useRef<number>(0);
   
-  // [수정] FallbackImage의 onLoad 콜백에서 호출될 핸들러
   const handleImageLoad = (key: string) => {
     setImageLoadStatus(prev => ({ ...prev, [key]: true }));
   };
 
-  // 탄약 부족 시 붉은색으로 깜빡이는 효과 추가
   const BulletUI = ({ isLoaded, width = 10, height = 24 }: { isLoaded: boolean, width?: number, height?: number }) => {
-    // 경고 상태일 때 붉은색(bg-red-600), 아니면 기존 로직 (노란색/회색)
     const bgColor = isAmmoWarning 
         ? 'bg-red-600 shadow-[0_0_8px_rgba(220,38,38,0.8)]' 
         : (isLoaded ? 'bg-yellow-500 shadow-[0_0_8px_rgba(250,204,21,0.6)]' : 'bg-gray-800');
@@ -136,9 +144,7 @@ const App: React.FC = () => {
         className={`relative rounded-sm transition-colors duration-200 ${bgColor}`}
         style={{ width: `${width}px`, height: `${height}px` }}
       >
-        {/* 광택(Highlight) 효과 */}
         <div className="absolute inset-0 rounded-sm border-t border-l border-white/30"></div>
-        {/* 그림자(Shadow) 효과 */}
         <div className="absolute inset-0 rounded-sm border-b border-r border-black/40"></div>
       </div>
     );
@@ -146,18 +152,12 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const preloadAssets = async () => {
-      // 모든 ASSETS 객체의 값(각각 string[] 타입)을 하나의 flat한 배열로 만듭니다.
-      // 이때, 각 에셋 배열의 첫 번째 URL (Google Cloud URL)만 추출하여 미리 로드합니다.
       const allAssetUrlsToPreload = Object.values(ASSETS).flatMap(paths => paths.length > 0 ? [paths[0]] : []);
-      // 업그레이드 아이콘도 미리 로드 목록에 추가
       const upgradeIconUrls = Object.values(UPGRADE_CONFIG).flatMap(config => config.ICON.length > 0 ? [config.ICON[0]] : []);
-
-      const imageUrlsToLoad = [...new Set([...allAssetUrlsToPreload, ...upgradeIconUrls])]; // 중복 제거
-
-      const totalAssets = imageUrlsToLoad.length + Object.keys(soundService.SOUND_ASSETS_CONFIG).length; // 사운드 에셋 개수 포함
+      const imageUrlsToLoad = [...new Set([...allAssetUrlsToPreload, ...upgradeIconUrls])];
+      const totalAssets = imageUrlsToLoad.length + Object.keys(soundService.SOUND_ASSETS_CONFIG).length;
       let loadedCount = 0;
       
-      // 이미지 로딩 프로미스 배열 생성
       const imagePromises = imageUrlsToLoad.map(url => {
         return new Promise<void>((resolve) => {
           const img = new Image();
@@ -176,35 +176,27 @@ const App: React.FC = () => {
         });
       });
       
-      // 이미지 로딩 대기
       await Promise.all(imagePromises);
 
-      // 사운드 서비스 초기화 및 로드 대기 (비동기 처리)
       try {
-        await soundService.init(); // init은 이제 async 함수
-        loadedCount += Object.keys(soundService.SOUND_ASSETS_CONFIG).length; // 로드된 사운드 수만큼 카운트 증가
+        await soundService.init();
+        loadedCount += Object.keys(soundService.SOUND_ASSETS_CONFIG).length;
         setLoadingProgress(Math.round((loadedCount / totalAssets) * 100));
       } catch (error) {
         console.error("사운드 서비스 초기화 실패:", error);
-        // 에러가 발생해도 로딩 진행률은 업데이트하여 멈추지 않도록 함
         loadedCount += Object.keys(soundService.SOUND_ASSETS_CONFIG).length; 
         setLoadingProgress(Math.round((loadedCount / totalAssets) * 100));
       }
 
-      // 최종적으로 모든 에셋 로딩 완료 후 상태 변경
       setIsLoadingAssets(false);
     };
     preloadAssets();
   }, []);
 
-  // 이 useEffect는 메뉴 화면에 처음 진입할 때만 실행됩니다.
-  // (미션 텍스트 생성, 사운드 로드, 업그레이드 초기화)
   useEffect(() => {
     if (gameStatus === GameStatus.MENU) {
-      // "신호 해독 중..." 애니메이션을 위한 인위적인 지연 시간 제거
       setMissionText(getRandomText(GAME_TEXT.MISSION_BRIEFINGS));
       
-      // 업그레이드 초기화
       setUpgradeLevels({
         [WeaponPart.SCOPE]: 0,
         [WeaponPart.BARREL]: 0,
@@ -218,13 +210,10 @@ const App: React.FC = () => {
     }
   }, [gameStatus]);
 
-  // 이 useEffect는 레벨업 화면이 뜰 때 실행됩니다.
-  // (개발자 모드용 좌표 초기화 등)
   useEffect(() => {
     if (gameStatus === GameStatus.LEVEL_UP) {
       setHoveredPart(null);
       
-      // --- Dev Mode Init ---
       const weaponConfig = WEAPONS[selectedWeaponKey];
       const initialPositions = weaponConfig.upgradePositions;
       const initialCharPos = weaponConfig.characterPosition;
@@ -247,27 +236,24 @@ const App: React.FC = () => {
           y: String(initialCharPos.y),
       };
       setDevInputValues(initialInputs);
-      // --- End Dev Mode Init ---
     }
   }, [gameStatus, selectedWeaponKey]);
 
 
   useEffect(() => {
-    // 무기 변경 또는 게임 메뉴로 돌아올 때, `stats`의 `maxAmmo`를 해당 무기의 기본값으로 설정
     if (gameStatus === GameStatus.MENU) {
         const weapon = WEAPONS[selectedWeaponKey];
         setStats(prev => ({ ...prev, ammo: weapon.maxAmmo, maxAmmo: weapon.maxAmmo }));
     }
   }, [selectedWeaponKey, gameStatus]);
   
-  // 업그레이드 화면 개발자 모드 토글 핸들러
   useEffect(() => {
     if (gameStatus !== GameStatus.LEVEL_UP) {
-        setIsUpgradeDevMode(false); // 화면 벗어나면 항상 비활성화
+        setIsUpgradeDevMode(false);
         return;
     }
     const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.code === 'Backquote') { // ` key
+        if (e.code === 'Backquote') {
             e.preventDefault();
             setIsUpgradeDevMode(prev => !prev);
         }
@@ -278,16 +264,20 @@ const App: React.FC = () => {
     };
   }, [gameStatus]);
 
-  // 인게임 HUD 개발자 모드 토글 핸들러
+  // [REFACTORED] 인게임 HUD 및 수류탄 UI 개발자 모드 순환 토글 핸들러
   useEffect(() => {
     if (gameStatus !== GameStatus.PLAYING) {
-      setIsHudDevMode(false);
+      setPlayingDevMode('none'); // 게임 플레이 상태가 아니면 항상 비활성화
       return;
     }
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Backquote') {
         e.preventDefault();
-        setIsHudDevMode(prev => !prev);
+        setPlayingDevMode(prev => {
+          if (prev === 'none') return 'hud';
+          if (prev === 'hud') return 'grenade';
+          return 'none'; // 'grenade' -> 'none'
+        });
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -296,16 +286,17 @@ const App: React.FC = () => {
     };
   }, [gameStatus]);
 
-  // 게임오버 화면 개발자 모드 토글 핸들러
+  // [BUG FIX] 게임오버 화면 개발자 모드 토글 핸들러 버그 수정
   useEffect(() => {
     if (gameStatus !== GameStatus.GAME_OVER) {
       setIsGameOverDevMode(false);
       return;
     }
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Backquote') { // ` key
+      if (e.code === 'Backquote') {
         e.preventDefault();
-        setIsUpgradeDevMode(prev => !prev);
+        // setIsUpgradeDevMode가 아닌 setIsGameOverDevMode를 토글하도록 수정
+        setIsGameOverDevMode(prev => !prev);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -328,21 +319,20 @@ const App: React.FC = () => {
     setGameStatus(GameStatus.GAME_OVER);
     setFinalReport({ score: finalScore, kills, wave });
 
-    // 인위적인 지연 시간을 제거하고, 게임 오버 즉시 최종 보고서 내용을 설정합니다.
     const messagePool = finalScore >= 500 ? GAME_TEXT.HIGH_SCORE_REPORTS : GAME_TEXT.LOW_SCORE_REPORTS;
     const flavorText = getRandomText(messagePool);
     const report = `${flavorText} (최종 점수: ${finalScore}, 처치: ${kills})`;
     setGameOverText(report);
   };
 
-  const handleUpdateStats = (newStats: { health: number; ammo: number; maxAmmo: number; score: number; wave: number; xp: number; maxXp: number; level: number; stamina: number; maxStamina: number; }) => {
-    // GameCanvas로부터 업그레이드가 적용된 maxAmmo를 받아서 상태 업데이트
+  const handleUpdateStats = (newStats: { 
+    health: number; ammo: number; maxAmmo: number; score: number; wave: number; xp: number; maxXp: number; level: number; stamina: number; maxStamina: number; grenadeCooldown: number; maxGrenadeCooldown: number;
+  }) => {
     setStats(newStats);
   };
 
   const handleShoot = useCallback((firedAmmoIndex: number) => {
       if (firedAmmoIndex < 1) return;
-
       const config = WEAPONS[selectedWeaponKey].uiCasingPhysics;
       const ammoConfig = WEAPONS[selectedWeaponKey].ammoUi; 
       let rect: { left: number; top: number; width: number; height: number } | null = null;
@@ -352,26 +342,22 @@ const App: React.FC = () => {
       if (el) {
         rect = el.getBoundingClientRect();
       } else {
-        // 요소가 없을 경우 예상 위치 계산 (폴백)
         const container = document.getElementById('ammo-container');
         if (container) {
             const containerRect = container.getBoundingClientRect();
-            
             const bW = ammoConfig.bulletWidth;
             const bH = ammoConfig.bulletHeight;
             const gap = ammoConfig.gap;
-            
             let offsetX = 0;
             let offsetY = 0;
 
             if (ammoConfig.layout === 'double') {
                 const isTopRow = firedAmmoIndex % 2 !== 0;
                 const colIndex = Math.floor((firedAmmoIndex - 1) / 2);
-                offsetX = colIndex * (bW + gap) + (isTopRow ? 0 : 10); // 10은 2열 오프셋
+                offsetX = colIndex * (bW + gap) + (isTopRow ? 0 : 10);
                 offsetY = isTopRow ? 0 : (bH + gap);
             } else {
-                // Single layout
-                const index = firedAmmoIndex - 1; // 0-based
+                const index = firedAmmoIndex - 1;
                 offsetX = index * (bW + gap);
                 offsetY = 0;
             }
@@ -387,62 +373,33 @@ const App: React.FC = () => {
 
       if (rect) {
         casingsRef.current.push({
-          id: Math.random().toString(),
-          x: rect.left,
-          y: rect.top,
-          width: rect.width,
-          height: rect.height,
-          vx: config.velocity.x + (Math.random() - 0.5) * config.velocityVariance.x,
-          vy: config.velocity.y + (Math.random() - 0.5) * config.velocityVariance.y,
-          rotation: 0,
-          vRotation: (Math.random() - 0.5) * config.rotationSpeed,
-          life: config.life,
-          maxLife: config.life,
-          color: '#fbbf24'
+          id: Math.random().toString(), x: rect.left, y: rect.top, width: rect.width, height: rect.height, vx: config.velocity.x + (Math.random() - 0.5) * config.velocityVariance.x, vy: config.velocity.y + (Math.random() - 0.5) * config.velocityVariance.y, rotation: 0, vRotation: (Math.random() - 0.5) * config.rotationSpeed, life: config.life, maxLife: config.life, color: '#fbbf24'
         });
       }
   }, [selectedWeaponKey]);
 
-  // 빈 총 발사 시 UI 효과 트리거 함수
   const handleDryFire = useCallback(() => {
       setIsAmmoWarning(true);
-      // 200ms 후에 경고 효과 해제 (짧은 깜빡임)
       setTimeout(() => {
           setIsAmmoWarning(false);
       }, 200);
   }, []);
 
   const handleUpgrade = (part: WeaponPart) => {
-    setUpgradeLevels(prev => ({
-        ...prev,
-        [part]: prev[part] + 1
-    }));
-    setGameStatus(GameStatus.PLAYING); // 게임 재개
+    setUpgradeLevels(prev => ({ ...prev, [part]: prev[part] + 1 }));
+    setGameStatus(GameStatus.PLAYING);
   };
 
-  /**
-   * 메뉴에서 무기를 선택했을 때 호출되는 핸들러입니다.
-   * @param key 선택된 무기의 고유 키 (예: 'Pistol', 'MP5')
-   */
   const handleSelectWeapon = (key: keyof typeof WEAPONS) => {
-    // 이미 선택된 무기를 다시 클릭하면 아무것도 하지 않습니다.
     if (selectedWeaponKey === key) return;
-
-    // 선택된 무기 상태를 업데이트합니다.
     setSelectedWeaponKey(key);
-    // UI 선택 사운드를 재생합니다.
     soundService.play('uiSelect');
   };
   
-  // --- 업그레이드 화면 개발자 모드 함수 ---
+  // --- 개발자 모드 함수 ---
   const handleUpgradeDevInputChange = (key: string, axis: 'ux' | 'uy' | 'ax' | 'ay' | 'x' | 'y', value: string) => {
       if (!/^-?\d*$/.test(value)) return;
-
-      setDevInputValues(prev => ({
-          ...prev,
-          [key]: { ...prev[key], [axis]: value }
-      }));
-
+      setDevInputValues(prev => ({ ...prev, [key]: { ...prev[key], [axis]: value } }));
       const parsedValue = parseInt(value, 10);
       const finalValue = isNaN(parsedValue) ? 0 : parsedValue;
 
@@ -453,12 +410,10 @@ const App: React.FC = () => {
               const newPos = { ...prev };
               const partKey = key as WeaponPart;
               if (!newPos[partKey]) return prev;
-
               if (axis === 'ux') newPos[partKey].x = finalValue;
               else if (axis === 'uy') newPos[partKey].y = finalValue;
               else if (axis === 'ax') newPos[partKey].anchor.x = finalValue;
               else if (axis === 'ay') newPos[partKey].anchor.y = finalValue;
-              
               return newPos;
           });
       }
@@ -466,13 +421,9 @@ const App: React.FC = () => {
 
   const handleCopyUpgradeCoords = () => {
     const weaponKey = selectedWeaponKey.toUpperCase();
-    let output = `// Paste this into weaponDb.ts\n\n`; // weaponDb.ts로 변경
-    
-    // Character Position
+    let output = `// Paste this into weaponDb.ts\n\n`;
     output += `// Character Position for ${weaponKey}\n`;
     output += `const ${weaponKey}_CHAR_POS = { x: ${devCharPosition.x}, y: ${devCharPosition.y} };\n\n`;
-
-    // Part Positions
     output += `// Part Positions for ${weaponKey}\n`;
     output += `const ${weaponKey}_UPGRADE_POS = {\n`;
   
@@ -491,7 +442,7 @@ const App: React.FC = () => {
     output += `// Then, update the WEAPON_DATABASE object:\n`;
     output += `'${selectedWeaponKey}': {\n`;
     output += `  // ... other properties\n`;
-    output += `  ui: {\n`; // ui 객체 안에 upgradePositions와 characterPosition이 있습니다.
+    output += `  ui: {\n`;
     output += `    characterPosition: ${weaponKey}_CHAR_POS,\n`;
     output += `    upgradePositions: ${weaponKey}_UPGRADE_POS\n`;
     output += `  }\n`;
@@ -503,63 +454,45 @@ const App: React.FC = () => {
         console.error('Failed to copy coordinates: ', err);
     });
   };
-  // ---
 
-  // --- HUD 개발자 모드 함수 ---
   const handleHudDevInputChange = (key: 'right' | 'bottom' | 'width', value: string) => {
     const parsedValue = parseFloat(value);
     if (!isNaN(parsedValue)) {
-      setHudDevSettings(prev => ({
-        ...prev,
-        [key]: parsedValue,
-      }));
+      setHudDevSettings(prev => ({ ...prev, [key]: parsedValue }));
     }
   };
 
   const handleCopyHudConfig = () => {
-    const output = `// Paste this into config/playerConfig.ts
-
-export const PLAYER_HUD_SETTINGS = {
-  right: '${hudDevSettings.right}rem',
-  bottom: '${hudDevSettings.bottom}rem',
-  width: '${hudDevSettings.width}rem',
-};
-`;
-    navigator.clipboard.writeText(output).then(() => {
-      alert('HUD Config copied to clipboard!');
-    }).catch(err => {
-      console.error('Failed to copy HUD config: ', err);
-    });
+    const output = `// Paste this into config/playerConfig.ts\n\nexport const PLAYER_HUD_SETTINGS = {\n  right: '${hudDevSettings.right}rem',\n  bottom: '${hudDevSettings.bottom}rem',\n  width: '${hudDevSettings.width}rem',\n};\n`;
+    navigator.clipboard.writeText(output).then(() => { alert('HUD Config copied to clipboard!'); }).catch(err => { console.error('Failed to copy HUD config: ', err); });
   };
-  // ---
+  
+  // [NEW] 수류탄 UI 개발자 모드 입력 핸들러
+  const handleGrenadeUiDevInputChange = (key: 'right' | 'bottom' | 'size', value: string) => {
+    const parsedValue = parseFloat(value);
+    if (!isNaN(parsedValue)) {
+      setGrenadeUiDevSettings(prev => ({ ...prev, [key]: parsedValue }));
+    }
+  };
 
-  // --- 게임오버 UI 개발자 모드 함수 ---
+  // [NEW] 수류탄 UI 개발자 모드 설정 복사 핸들러
+  const handleCopyGrenadeUiConfig = () => {
+    const output = `// Paste this into config/playerConfig.ts\n\nexport const GRENADE_UI_SETTINGS = {\n  right: '${grenadeUiDevSettings.right}rem',\n  bottom: '${grenadeUiDevSettings.bottom}rem',\n  size: '${grenadeUiDevSettings.size}rem',\n};\n`;
+    navigator.clipboard.writeText(output).then(() => { alert('Grenade UI Config copied to clipboard!'); }).catch(err => { console.error('Failed to copy Grenade UI config: ', err); });
+  };
+  
   const handleGameOverDevInputChange = (key: 'width' | 'left' | 'bottom', value: string) => {
     const parsedValue = parseFloat(value);
     if (!isNaN(parsedValue)) {
-      setGameOverDevSettings(prev => ({
-        ...prev,
-        [key]: parsedValue,
-      }));
+      setGameOverDevSettings(prev => ({ ...prev, [key]: parsedValue }));
     }
   };
 
   const handleCopyGameOverConfig = () => {
-    const output = `// Paste this into config/playerConfig.ts
-
-export const GAME_OVER_UI_SETTINGS = {
-  imageWidth: '${gameOverDevSettings.width}rem',
-  imageLeft: '${gameOverDevSettings.left}rem',
-  imageBottom: '${gameOverDevSettings.bottom}rem',
-};
-`;
-    navigator.clipboard.writeText(output).then(() => {
-      alert('Game Over UI Config copied to clipboard!');
-    }).catch(err => {
-      console.error('Failed to copy Game Over UI config: ', err);
-    });
+    const output = `// Paste this into config/playerConfig.ts\n\nexport const GAME_OVER_UI_SETTINGS = {\n  imageWidth: '${gameOverDevSettings.width}rem',\n  imageLeft: '${gameOverDevSettings.left}rem',\n  imageBottom: '${gameOverDevSettings.bottom}rem',\n};\n`;
+    navigator.clipboard.writeText(output).then(() => { alert('Game Over UI Config copied to clipboard!'); }).catch(err => { console.error('Failed to copy Game Over UI config: ', err); });
   };
-  // ---
+  // --- ---
 
   useEffect(() => {
     const animate = (time: number) => {
@@ -586,7 +519,6 @@ export const GAME_OVER_UI_SETTINGS = {
             ctx.fillStyle = c.color;
             ctx.globalAlpha = Math.max(0, c.life / 0.5); 
             ctx.fillRect(-c.width / 2, -c.height / 2, c.width, c.height);
-            // 시인성을 위해 테두리 추가
             ctx.strokeStyle = 'rgba(0,0,0,0.5)';
             ctx.lineWidth = 1;
             ctx.strokeRect(-c.width / 2, -c.height / 2, c.width, c.height);
@@ -632,7 +564,6 @@ export const GAME_OVER_UI_SETTINGS = {
         className={`relative w-full h-screen bg-black flex flex-col items-center justify-center overflow-hidden text-white select-none ${!isLoadingAssets ? 'cursor-pointer' : ''}`}
       >
          <div className="absolute inset-0 z-0">
-            {/* FallbackImage 컴포넌트는 srcs 배열을 받으므로, ASSETS.LOADING_SCREEN은 string[] 타입이어야 합니다. */}
             <FallbackImage srcs={ASSETS.LOADING_SCREEN} className="w-full h-full object-cover opacity-80 filter contrast-110" alt="Loading Background" />
             <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/20"></div>
          </div>
@@ -669,76 +600,70 @@ export const GAME_OVER_UI_SETTINGS = {
       </div>
   );
 
-  // 로딩 화면이거나 사용자 입력을 기다리는 중이면 로딩 화면을 먼저 반환
   if (waitingForInput) {
     return renderLoadingScreen();
   }
     
-  // 업그레이드 화면 위치 데이터 (개발자 모드 여부에 따라 결정)
   const currentUpgradePositions = isUpgradeDevMode ? devUpgradePositions : WEAPONS[selectedWeaponKey].upgradePositions;
   
-  // 인게임 HUD 위치 데이터 (개발자 모드 여부에 따라 결정)
-  const currentHudSettings = isHudDevMode ? hudDevSettings : {
+  // [REFACTORED] 개발자 모드 상태에 따라 UI 설정을 동적으로 결정합니다.
+  const currentHudSettings = playingDevMode === 'hud' ? hudDevSettings : {
     right: parseFloat(PLAYER_HUD_SETTINGS.right),
     bottom: parseFloat(PLAYER_HUD_SETTINGS.bottom),
     width: parseFloat(PLAYER_HUD_SETTINGS.width),
   };
-
   const hudStyle = {
     right: `${currentHudSettings.right}rem`,
     bottom: `${currentHudSettings.bottom}rem`,
     width: `${currentHudSettings.width}rem`,
   };
 
-  // 게임오버 UI 위치 데이터 (개발자 모드 여부에 따라 결정)
+  const currentGrenadeUiSettings = playingDevMode === 'grenade' ? grenadeUiDevSettings : {
+    right: parseFloat(GRENADE_UI_SETTINGS.right),
+    bottom: parseFloat(GRENADE_UI_SETTINGS.bottom),
+    size: parseFloat(GRENADE_UI_SETTINGS.size),
+  };
+  const grenadeUiStyle = {
+    right: `${currentGrenadeUiSettings.right}rem`,
+    bottom: `${currentGrenadeUiSettings.bottom}rem`,
+    width: `${currentGrenadeUiSettings.size}rem`,
+    height: `${currentGrenadeUiSettings.size}rem`,
+  };
+
   const currentGameOverUiSettings = isGameOverDevMode ? gameOverDevSettings : {
     width: parseFloat(GAME_OVER_UI_SETTINGS.imageWidth),
     left: parseFloat(GAME_OVER_UI_SETTINGS.imageLeft),
     bottom: parseFloat(GAME_OVER_UI_SETTINGS.imageBottom),
   };
-
   const gameOverImageStyle = {
     width: `${currentGameOverUiSettings.width}rem`,
     left: `${currentGameOverUiSettings.left}rem`,
     bottom: `${currentGameOverUiSettings.bottom}rem`,
   };
 
-  // 설정 파일에서 업그레이드 화면의 무기 이미지 스케일 값을 가져옵니다.
   const upgradeImageScale = WEAPONS[selectedWeaponKey].upgradeImageScale || 1.0;
 
-  // 무기 틸트 효과 계산
-  // 기본 transform 문자열에 scale(${upgradeImageScale})을 추가합니다.
   let weaponTiltStyle = { transform: `translate(-50%, -50%) scale(${upgradeImageScale}) rotateX(0deg) rotateY(0deg)`, transition: 'transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)' };
   if (hoveredPart) {
       const pos = currentUpgradePositions[hoveredPart];
       if (pos) {
-          // 최대 기울기 각도 (도). 이 값을 높이면 마우스 호버 시 무기가 더 많이 기울어집니다. (예: 15 -> 25)
           const maxTilt = 25; 
-          // 화면 중앙 기준 좌표를 이용해 회전값 계산
-          // Y가 클수록(아래) X축 양(+)의 회전, X가 클수록(오른쪽) Y축 음(-)의 회전
-          const rotX = (pos.y / 250) * maxTilt; // 최대 Y 오프셋 기준
-          const rotY = -(pos.x / 450) * maxTilt; // 최대 X 오프셋 기준
+          const rotX = (pos.y / 250) * maxTilt;
+          const rotY = -(pos.x / 450) * maxTilt;
           weaponTiltStyle = {
               ...weaponTiltStyle,
-              // 호버 시 transform 문자열에도 scale(${upgradeImageScale})을 포함시켜 크기가 유지되도록 합니다.
               transform: `translate(-50%, -50%) scale(${upgradeImageScale}) rotateX(${rotX}deg) rotateY(${rotY}deg)`
           };
       }
   }
 
-  // --- 탄약 UI 렌더링을 위한 계산 및 설정 ---
   const currentAmmoUiConfig = WEAPONS[selectedWeaponKey].ammoUi;
-  
-  // 기본값 설정 (설정 파일에 없을 경우를 대비)
   const ammoUiLayout = currentAmmoUiConfig?.layout || 'single';
   const bulletW = currentAmmoUiConfig?.bulletWidth || 10;
   const bulletH = currentAmmoUiConfig?.bulletHeight || 24;
   const gap = currentAmmoUiConfig?.gap || 4;
-
   const totalBullets = stats.maxAmmo;
   const currentAmmo = stats.ammo;
-
-  // 현재 무기의 HUD 아이콘 스케일 값을 설정 파일에서 가져옵니다.
   const hudIconScale = WEAPONS[selectedWeaponKey].hudIconScale || 1;
 
   return (
@@ -751,37 +676,48 @@ export const GAME_OVER_UI_SETTINGS = {
       onUpdateStats={handleUpdateStats}
       onGameOver={handleGameOver}
       onShoot={handleShoot}
-      onDryFire={handleDryFire} // 콜백 전달
-      isPaused={isHudDevMode || gameStatus === GameStatus.LEVEL_UP || gameStatus === GameStatus.GAME_OVER || gameStatus === GameStatus.MENU}
+      onDryFire={handleDryFire}
+      isPaused={playingDevMode !== 'none' || isUpgradeDevMode || isGameOverDevMode || gameStatus === GameStatus.LEVEL_UP || gameStatus === GameStatus.GAME_OVER || gameStatus === GameStatus.MENU}
     />
 
-    {/* UI용 탄피 캔버스 - Z-Index를 50으로 높여서 다른 UI 위에 확실히 그려지게 함 */}
     <canvas ref={uiCanvasRef} className="absolute inset-0 pointer-events-none" style={{ zIndex: 50 }} />
 
-    {/* 인게임 HUD 개발자 모드 */}
-    {isHudDevMode && (
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[100] bg-yellow-500 text-black p-2 rounded shadow-lg flex items-center gap-4 font-sans pointer-events-auto">
-        <p className="font-bold text-sm uppercase">HUD Dev Mode</p>
+    {/* [REFACTORED] HUD 개발자 모드 UI (위치 변경) */}
+    {playingDevMode === 'hud' && (
+      <div className="absolute bottom-4 left-4 z-[100] bg-yellow-500 text-black p-2 rounded shadow-lg flex items-center gap-4 font-sans pointer-events-auto">
+        <p className="font-bold text-sm uppercase">HUD Dev (`)</p>
         <div className="flex gap-2 items-center">
-          <label className="text-xs font-bold">Right (rem):</label>
+          <label className="text-xs font-bold">R:</label>
           <input type="number" step="0.1" value={hudDevSettings.right} onChange={(e) => handleHudDevInputChange('right', e.target.value)} className="w-16 bg-black/20 text-white text-xs p-1 rounded text-center" />
-          <label className="text-xs font-bold">Bottom (rem):</label>
+          <label className="text-xs font-bold">B:</label>
           <input type="number" step="0.1" value={hudDevSettings.bottom} onChange={(e) => handleHudDevInputChange('bottom', e.target.value)} className="w-16 bg-black/20 text-white text-xs p-1 rounded text-center" />
-          <label className="text-xs font-bold">Width (rem):</label>
+          <label className="text-xs font-bold">W:</label>
           <input type="number" step="0.1" value={hudDevSettings.width} onChange={(e) => handleHudDevInputChange('width', e.target.value)} className="w-16 bg-black/20 text-white text-xs p-1 rounded text-center" />
         </div>
-        <button onClick={handleCopyHudConfig} className="bg-black text-white px-3 py-1 rounded text-xs hover:bg-gray-700">
-          Copy Config
-        </button>
+        <button onClick={handleCopyHudConfig} className="bg-black text-white px-3 py-1 rounded text-xs hover:bg-gray-700">Copy</button>
       </div>
     )}
 
-    {/* 인게임 HUD: 레벨업 시에도 DOM에서 제거되지 않도록 렌더링 조건 수정 */}
+    {/* [NEW] 수류탄 UI 개발자 모드 */}
+    {playingDevMode === 'grenade' && (
+      <div className="absolute bottom-4 right-4 z-[100] bg-yellow-500 text-black p-2 rounded shadow-lg flex items-center gap-4 font-sans pointer-events-auto">
+        <p className="font-bold text-sm uppercase">Grenade UI Dev (`)</p>
+        <div className="flex gap-2 items-center">
+          <label className="text-xs font-bold">R:</label>
+          <input type="number" step="0.1" value={grenadeUiDevSettings.right} onChange={(e) => handleGrenadeUiDevInputChange('right', e.target.value)} className="w-16 bg-black/20 text-white text-xs p-1 rounded text-center" />
+          <label className="text-xs font-bold">B:</label>
+          <input type="number" step="0.1" value={grenadeUiDevSettings.bottom} onChange={(e) => handleGrenadeUiDevInputChange('bottom', e.target.value)} className="w-16 bg-black/20 text-white text-xs p-1 rounded text-center" />
+          <label className="text-xs font-bold">Size:</label>
+          <input type="number" step="0.1" value={grenadeUiDevSettings.size} onChange={(e) => handleGrenadeUiDevInputChange('size', e.target.value)} className="w-16 bg-black/20 text-white text-xs p-1 rounded text-center" />
+        </div>
+        <button onClick={handleCopyGrenadeUiConfig} className="bg-black text-white px-3 py-1 rounded text-xs hover:bg-gray-700">Copy</button>
+      </div>
+    )}
+
     {(gameStatus === GameStatus.PLAYING || gameStatus === GameStatus.LEVEL_UP) && (
       <>
         <div className="absolute inset-0 pointer-events-none py-1 px-4 flex flex-col justify-between z-20">
           <div className="flex justify-between items-start pt-2">
-            {/* 조작법 UI (좌측 상단) - 배경 제거 및 크기 축소 */}
             <div className="p-2 text-left">
                 <p 
                   className="text-xs text-green-500 uppercase font-bold tracking-widest mb-1"
@@ -818,12 +754,9 @@ export const GAME_OVER_UI_SETTINGS = {
 
           <div className="flex justify-between items-end w-full">
             <div className="flex items-end">
-                {/* HUD 컨테이너 min-width 증가 및 내부 아이콘 크기 조정 */}
                 <div className="flex items-center gap-2 bg-black/70 backdrop-blur-md pb-2 px-4 pr-8 rounded-tr-3xl shadow-2xl min-w-[440px]">
                     <div className="flex flex-col items-center justify-center w-60 shrink-0">
-                      {/* 무기 아이콘 확대 (w-48 -> w-60, h-28 -> h-32) 및 내부 이미지 스케일 업 */}
                       <div className="w-full h-32 flex items-center justify-center">
-                          {/* 동적으로 무기 아이콘 컴포넌트를 선택합니다. */}
                           {React.createElement(
                             { Pistol: PistolIcon, MP5: MP5Icon, Rifle: RifleIcon, Shotgun: ShotgunIcon }[selectedWeaponKey],
                             {
@@ -835,7 +768,6 @@ export const GAME_OVER_UI_SETTINGS = {
                       </div>
                     </div>
                     <div className="w-px h-20 bg-gray-600/50"></div>
-                    {/* 무기 정보 컨테이너: justify-center 제거하여 상단 정렬 */}
                     <div className="flex flex-col gap-1 flex-1">
                       <div className="flex justify-between items-end border-b border-gray-600/50 pb-1">
                           <div className="flex flex-col mb-1">
@@ -843,13 +775,11 @@ export const GAME_OVER_UI_SETTINGS = {
                               <span className="text-xs text-gray-400 uppercase leading-none mt-0.5">{WEAPONS[selectedWeaponKey].type}</span>
                           </div>
                           <div className="text-5xl font-bold text-yellow-400 leading-none pl-6 shadow-black drop-shadow-md flex items-baseline">
-                              {/* 탄약 수가 변경되어도 레이아웃이 흔들리지 않도록 고정 너비(w-14)와 오른쪽 정렬(text-right)을 추가합니다. */}
                               <span className="inline-block w-14 text-right">{stats.ammo}</span>
                               <span className="text-xl text-gray-500 ml-1">/{stats.maxAmmo}</span>
                           </div>
                       </div>
                       
-                      {/* 레벨과 경험치 바를 한 줄에 나란히 배치하고, 상단 여백(mt-1)을 제거하여 더 컴팩트하게 만듭니다. */}
                       <div className="flex items-center gap-4">
                         <div className="flex items-baseline gap-1">
                           <span className="text-yellow-600 font-bold text-lg">LV.</span>
@@ -857,7 +787,6 @@ export const GAME_OVER_UI_SETTINGS = {
                             {stats.level.toString().padStart(2, '0')}
                           </span>
                         </div>
-                        {/* 경험치 바 컨테이너 */}
                         <div className="flex-1 relative">
                             <div className="w-full h-4 bg-gray-800/50 rounded-full overflow-hidden border-2 border-gray-900/80 relative shadow-inner">
                               <div 
@@ -871,17 +800,15 @@ export const GAME_OVER_UI_SETTINGS = {
                         </div>
                       </div>
 
-                      {/* 동적 탄약 UI 렌더링. 경고 상태일 경우 흔들림 애니메이션 적용 */}
                       <div 
                         id="ammo-container" 
                         className={`flex flex-col gap-1 h-auto mt-1 ${isAmmoWarning ? 'animate-shake-x' : ''}`} 
                         style={{ gap: `${gap}px` }}
                       >
                             {ammoUiLayout === 'single' ? (
-                                /* 1열 배치 (Single Column) */
                                 <div className="flex" style={{ gap: `${gap}px` }}>
                                     {Array.from({ length: totalBullets }).map((_, i) => {
-                                        const bulletId = i + 1; // 1-based index for single row
+                                        const bulletId = i + 1;
                                         return (
                                             <div key={`bullet-${i}`} id={`bullet-${bulletId}`}>
                                                 <BulletUI isLoaded={i < currentAmmo} width={bulletW} height={bulletH} />
@@ -890,7 +817,6 @@ export const GAME_OVER_UI_SETTINGS = {
                                     })}
                                 </div>
                             ) : (
-                                /* 2열 배치 (Double Column - Zigzag) */
                                 <>
                                     {(() => {
                                         const bulletsInFirstRow = Math.ceil(totalBullets / 2);
@@ -900,7 +826,6 @@ export const GAME_OVER_UI_SETTINGS = {
 
                                         return (
                                             <>
-                                                {/* Top Row (홀수 번호 총알: 1, 3, 5...) */}
                                                 <div className="flex" style={{ gap: `${gap}px` }}>
                                                     {Array.from({ length: bulletsInFirstRow }).map((_, i) => {
                                                         const bulletId = (i * 2) + 1;
@@ -911,7 +836,6 @@ export const GAME_OVER_UI_SETTINGS = {
                                                         );
                                                     })}
                                                 </div>
-                                                {/* Bottom Row (짝수 번호 총알: 2, 4, 6...) */}
                                                 {bulletsInSecondRow > 0 && (
                                                   <div className="flex ml-2.5" style={{ gap: `${gap}px` }}>
                                                       {Array.from({ length: bulletsInSecondRow }).map((_, i) => {
@@ -936,7 +860,41 @@ export const GAME_OVER_UI_SETTINGS = {
           </div>
         </div>
         
-        {/* 오른쪽 하단 캐릭터 초상화 및 체력바 */}
+        {/* [REFACTORED] 수류탄 UI 스타일을 동적으로 적용 */}
+        <div 
+            style={grenadeUiStyle}
+            className="absolute z-10 flex items-center justify-center pointer-events-none"
+        >
+            <GrenadeIcon alt="수류탄" className="w-full h-full object-contain filter drop-shadow-lg" />
+            
+            {stats.grenadeCooldown > 0 ? (
+                <>
+                    <svg className="absolute inset-0 w-full h-full" viewBox="0 0 36 36">
+                        <circle className="text-black/50" strokeWidth="4" stroke="currentColor" fill="transparent" r="16" cx="18" cy="18" />
+                        <circle
+                            className="text-yellow-400"
+                            strokeWidth="4"
+                            strokeDasharray={`${(stats.grenadeCooldown / stats.maxGrenadeCooldown) * 100}, 100`}
+                            strokeLinecap="round"
+                            stroke="currentColor"
+                            fill="transparent"
+                            r="16"
+                            cx="18"
+                            cy="18"
+                            style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }}
+                        />
+                    </svg>
+                    <span className="absolute text-2xl font-bold text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
+                        {Math.ceil(stats.grenadeCooldown)}
+                    </span>
+                </>
+            ) : (
+                <span className="absolute text-3xl font-bold text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
+                    Q
+                </span>
+            )}
+        </div>
+        
         <div style={hudStyle} className="absolute flex flex-col gap-2 z-10 opacity-90 pointer-events-none pr-2">
             <FallbackImage
                 srcs={ASSETS[('CHAR_' + (selectedWeaponKey === 'Pistol' ? 'DEFAULT' : selectedWeaponKey.toUpperCase())) as keyof typeof ASSETS]}
@@ -956,10 +914,8 @@ export const GAME_OVER_UI_SETTINGS = {
       </>
     )}
 
-    {/* Level Up Blueprint UI: 조건부 렌더링에서 투명도 제어로 변경 */}
     <div className={`absolute inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 md:p-12 overflow-hidden transition-opacity duration-300 ${gameStatus === GameStatus.LEVEL_UP ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
         
-        {/* Dev Mode UI */}
         {isUpgradeDevMode && (
           <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[100] bg-yellow-500 text-black p-2 rounded shadow-lg flex items-center gap-4">
               <p className="font-bold text-sm uppercase">Upgrade Dev Mode (` key)</p>
@@ -975,9 +931,7 @@ export const GAME_OVER_UI_SETTINGS = {
           </div>
         )}
 
-        {/* Container for positioning character and modal */}
         <div className="relative">
-            {/* Main Modal Container */}
             <div className="relative w-full max-w-screen-2xl min-h-[550px] bg-black/70 backdrop-blur-md rounded-lg shadow-[0_0_50px_rgba(34,197,94,0.1)] flex flex-col">
                 <div className="absolute inset-0 bg-[linear-gradient(rgba(34,197,94,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(34,197,94,0.1)_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none"></div>
                 
@@ -1006,7 +960,6 @@ export const GAME_OVER_UI_SETTINGS = {
                       
                       <svg className="absolute top-0 left-0 overflow-visible z-30 pointer-events-none">
                           {Object.entries(currentUpgradePositions).map(([part, posUntyped]) => {
-                              // FIX: `pos`가 `unknown` 타입으로 추론되는 문제를 해결하기 위해 명시적으로 타입을 지정합니다.
                               const pos = posUntyped as UpgradePositionInfo;
                               const buttonWidth = 192; 
                               const buttonHeight = 90;
@@ -1042,9 +995,7 @@ export const GAME_OVER_UI_SETTINGS = {
                           })}
                       </svg>
 
-                      {/* 개발자 모드: 앵커 포인트 좌표 표시 (HTML로 변경) */}
                       {isUpgradeDevMode && Object.entries(currentUpgradePositions).map(([part, posUntyped]) => {
-                          // FIX: `pos`가 `unknown` 타입으로 추론되는 문제를 해결하기 위해 명시적으로 타입을 지정합니다.
                           const pos = posUntyped as UpgradePositionInfo;
                           return (
                           <div
@@ -1062,7 +1013,6 @@ export const GAME_OVER_UI_SETTINGS = {
                           className="absolute top-0 left-0 z-10 flex items-center justify-center"
                           style={{ ...weaponTiltStyle, transformStyle: 'preserve-3d' }}
                       >
-                           {/* [수정] FallbackImage가 로드될 때까지 WeaponLoader를 배경에 표시합니다. */}
                            { !imageLoadStatus['upgrade-' + selectedWeaponKey] && <WeaponLoader className="absolute inset-0 z-0" /> }
                            <FallbackImage 
                               srcs={WEAPONS[selectedWeaponKey].upgradeImage || []} 
@@ -1073,7 +1023,6 @@ export const GAME_OVER_UI_SETTINGS = {
                       </div>
 
                       {Object.entries(currentUpgradePositions).map(([part, posUntyped]) => {
-                          // FIX: `pos`가 `unknown` 타입으로 추론되는 문제를 해결하기 위해 명시적으로 타입을 지정합니다.
                           const pos = posUntyped as UpgradePositionInfo;
                           const currentLevel = upgradeLevels[part as WeaponPart];
                           const info = UPGRADE_CONFIG[part as WeaponPart];
@@ -1088,7 +1037,6 @@ export const GAME_OVER_UI_SETTINGS = {
                                   onMouseEnter={() => setHoveredPart(part as WeaponPart)}
                                   onMouseLeave={() => setHoveredPart(null)}
                               >
-                                {/* 개발자 모드: UI 박스 좌표 표시 (z-index 추가) */}
                                 {isUpgradeDevMode && (
                                     <div className="absolute -top-4 -right-2 text-yellow-400 text-[10px] font-mono bg-black/50 px-1 rounded z-[101] whitespace-nowrap">
                                         (ux: {pos.x}, uy: {pos.y})
@@ -1101,9 +1049,7 @@ export const GAME_OVER_UI_SETTINGS = {
                                   >
                                       <div className="flex gap-3 items-center mb-2">
                                           <div className={`w-14 h-14 shrink-0 border-2 relative ${isMaxed ? 'border-yellow-500/30 bg-yellow-900/10' : 'border-green-900/20'} flex items-center justify-center rounded-md`}>
-                                              {/* 업그레이드 아이콘도 FallbackImage를 사용하며, 로딩 스피너는 FallbackImage 내부에서 처리됩니다. */}
                                               <FallbackImage srcs={info.ICON} alt={info.NAME} className="absolute inset-0 w-full h-full object-contain p-1" />
-                                              {/* 로딩 중일 때 표시할 스피너 또는 로더 */}
                                               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                                 <div className="w-1 h-1 bg-green-500/50 rounded-full animate-pulse"></div>
                                               </div>
@@ -1119,7 +1065,6 @@ export const GAME_OVER_UI_SETTINGS = {
                                       </div>
                                   </button>
 
-                                  {/* Dev Mode Input Fields (레이아웃 개선 및 z-index 추가) */}
                                   {isUpgradeDevMode && (
                                       <div className="absolute top-1/2 -translate-y-1/2 left-full ml-4 z-[100] bg-black/80 p-2 rounded backdrop-blur-sm text-xs whitespace-nowrap">
                                           <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 items-center">
@@ -1168,19 +1113,14 @@ export const GAME_OVER_UI_SETTINGS = {
           <div className="max-w-[90vw] w-full p-8 bg-[#111827] bg-[linear-gradient(rgba(34,197,94,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(34,197,94,0.1)_1px,transparent_1px)] bg-[size:30px_30px] shadow-[0_0_50px_rgba(34,197,94,0.2)] rounded-lg flex flex-col md:flex-row gap-8 items-stretch h-[80vh]">
             <div className="md:w-[45%] flex flex-col h-full">
               <div className="relative border-2 border-green-700 bg-black h-full overflow-hidden rounded group flex-1">
-                  {/* 로더는 현재 선택된 무기의 이미지가 로드되지 않았을 때만 표시합니다. */}
                   { !imageLoadStatus['char-' + selectedWeaponKey] && <TacticalLoader className="absolute inset-0 z-10" /> }
                   
-                  {/* [수정] 캐릭터 이미지 로딩 중일 때 스캔 애니메이션을 표시합니다. */}
-                  {/* key={selectedWeaponKey}를 사용하여 무기 변경 시 애니메이션을 다시 트리거합니다. */}
                   { !imageLoadStatus['char-' + selectedWeaponKey] && 
                     <div key={selectedWeaponKey} className="animate-scan pointer-events-none absolute inset-0 z-[25]"></div>
                   }
 
-                  {/* 모든 캐릭터 이미지를 렌더링하되, 선택된 것만 표시하여 이미지 전환 딜레이를 제거합니다. */}
                   {Object.keys(WEAPONS).map((key) => {
                     const weaponKey = key as keyof typeof WEAPONS;
-                    // 권총은 'CHAR_DEFAULT' 에셋을 사용하고 나머지는 무기 이름에 맞춰 동적으로 키를 생성합니다.
                     const charAssetKey = (key === 'Pistol' ? 'CHAR_DEFAULT' : `CHAR_${key.toUpperCase()}`) as keyof typeof ASSETS;
                     const charAssetPaths = ASSETS[charAssetKey] || [];
                     const imageKey = 'char-' + key;
@@ -1192,7 +1132,6 @@ export const GAME_OVER_UI_SETTINGS = {
                             srcs={charAssetPaths}
                             alt={GAME_TEXT.MENU.CHAR_NAME}
                             onLoad={() => handleImageLoad(imageKey)}
-                            // 선택된 무기이고, 로딩이 완료된 경우에만 이미지를 보여줍니다.
                             className={`absolute inset-0 w-full h-full object-cover object-[40%_50%] transition-opacity duration-300 ${isSelectedAndLoaded ? 'opacity-100 z-20' : 'opacity-0 z-0 pointer-events-none'}`}
                         />
                     );
@@ -1222,9 +1161,7 @@ export const GAME_OVER_UI_SETTINGS = {
               
               <div className="mb-16">
                   <div className="text-base font-bold tracking-widest mb-2 border-b border-green-900 pb-1 text-green-600">{GAME_TEXT.MENU.LOADOUT_HEADER}</div>
-                  {/* 전체 무기 선택 그리드에 `relative` 및 `overflow-hidden`을 추가합니다. */}
                   <div className="grid grid-cols-4 gap-4 h-56 relative overflow-hidden">
-                      {/* 스캔 이펙트를 각 슬롯에서 제거하고, 그리드 전체를 덮도록 단일화합니다. */}
                       <div className="animate-scan pointer-events-none absolute inset-0 z-[15]"></div>
                       {Object.entries(WEAPONS).map(([key, weapon]) => {
                           let WeaponIconComponent;
@@ -1284,7 +1221,6 @@ export const GAME_OVER_UI_SETTINGS = {
     {gameStatus === GameStatus.GAME_OVER && finalReport && (
       <div className="absolute inset-0 z-30 flex items-center justify-center bg-red-900/40 backdrop-blur-md">
         
-        {/* Game Over UI Dev Mode */}
         {isGameOverDevMode && (
           <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[100] bg-yellow-500 text-black p-2 rounded shadow-lg flex items-center gap-4 font-sans pointer-events-auto">
             <p className="font-bold text-sm uppercase">Game Over UI Dev Mode</p>
@@ -1335,18 +1271,8 @@ export const GAME_OVER_UI_SETTINGS = {
             <button 
                 onClick={() => {
                   setGameStatus(GameStatus.MENU);
-                  // Stats reset
                   setStats({ 
-                    health: PLAYER_STATS.maxHealth, 
-                    ammo: WEAPONS[selectedWeaponKey].maxAmmo, 
-                    maxAmmo: WEAPONS[selectedWeaponKey].maxAmmo, 
-                    score: 0, 
-                    wave: 1, 
-                    xp: 0, 
-                    maxXp: PLAYER_LEVELING_SETTINGS.baseMaxXp, // 초기 필요 경험치 설정
-                    level: 1,
-                    stamina: PLAYER_STATS.maxStamina,
-                    maxStamina: PLAYER_STATS.maxStamina
+                    health: PLAYER_STATS.maxHealth, ammo: WEAPONS[selectedWeaponKey].maxAmmo, maxAmmo: WEAPONS[selectedWeaponKey].maxAmmo, score: 0, wave: 1, xp: 0, maxXp: PLAYER_LEVELING_SETTINGS.baseMaxXp, level: 1, stamina: PLAYER_STATS.maxStamina, maxStamina: PLAYER_STATS.maxStamina, grenadeCooldown: 0, maxGrenadeCooldown: GRENADE_STATS.baseCooldown,
                   });
                 }}
                 className="w-full py-3 bg-red-700 hover:bg-red-600 text-white font-bold text-lg uppercase transition-all hover:shadow-[0_0_15px_rgba(220,38,38,0.5)]"

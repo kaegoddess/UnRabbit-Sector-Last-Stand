@@ -10,6 +10,7 @@ interface WeaponIconWrapperProps {
   className?: string;
   alt: string; // alt 속성을 필수로 추가
   style?: React.CSSProperties;
+  onLoad?: () => void; // onLoad 콜백을 선택적으로 추가합니다.
 }
 
 // 로딩 중일 때 보여줄 전술적 스캔 UI (캐릭터용, 텍스트 포함)
@@ -50,6 +51,31 @@ export const WeaponLoader: React.FC<{ className?: string }> = ({ className }) =>
      </div>
   </div>
 );
+
+// [NEW] 수류탄 벡터 아이콘
+export const GrenadeVector: React.FC<WeaponIconWrapperProps> = ({ className }) => (
+  <svg viewBox="0 0 100 100" className={className} xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="grenadeGrad" cx="0.3" cy="0.3" r="0.7">
+        <stop offset="0%" stopColor="#679436" />
+        <stop offset="100%" stopColor="#2a481e" />
+      </radialGradient>
+    </defs>
+    {/* Body */}
+    <circle cx="50" cy="55" r="35" fill="url(#grenadeGrad)" />
+    {/* Texture */}
+    <rect x="25" y="30" width="50" height="10" fill="#2a481e" rx="3" />
+    <rect x="25" y="45" width="50" height="10" fill="#2a481e" rx="3" />
+    <rect x="25" y="60" width="50" height="10" fill="#2a481e" rx="3" />
+    <rect x="25" y="75" width="50" height="10" fill="#2a481e" rx="3" />
+    {/* Top part */}
+    <rect x="40" y="10" width="20" height="20" fill="#4a4a4a" rx="2" />
+    <rect x="45" y="5" width="10" height="10" fill="#333" />
+    {/* Pin */}
+    <circle cx="65" cy="15" r="7" fill="none" stroke="#a0a0a0" strokeWidth="3" />
+  </svg>
+);
+
 
 // PNG 로드 실패 시 보여줄 벡터(SVG) 아이콘 - M1911
 export const M1911Vector: React.FC<WeaponIconWrapperProps> = ({ className }) => (
@@ -197,7 +223,7 @@ const WeaponIcon: React.FC<WeaponIconProps> = ({ imagePaths, fallback, className
   // 이미지 로드 실패 시, SVG 폴백을 렌더링합니다.
   if (imageFailed) {
     // React.cloneElement를 사용하여 fallback 컴포넌트에 props를 전달합니다.
-    return React.cloneElement(fallback, { className, style });
+    return React.cloneElement(fallback, { className, style, alt });
   }
 
   // 성공 시, FallbackImage를 렌더링합니다.
@@ -218,7 +244,7 @@ const WeaponIcon: React.FC<WeaponIconProps> = ({ imagePaths, fallback, className
 export const PistolIcon: React.FC<WeaponIconWrapperProps> = ({ className, style, alt, ...rest }) => (
     <WeaponIcon 
       imagePaths={ASSETS.WEAPON_M1911}
-      fallback={<M1911Vector className={className} alt={alt} {...rest}/>}
+      fallback={<M1911Vector alt={alt} />}
       className={className} 
       alt={alt} 
       style={style}
@@ -230,7 +256,7 @@ export const PistolIcon: React.FC<WeaponIconWrapperProps> = ({ className, style,
 export const MP5Icon: React.FC<WeaponIconWrapperProps> = ({ className, style, alt, ...rest }) => (
     <WeaponIcon 
       imagePaths={ASSETS.WEAPON_MP5}
-      fallback={<MP5Vector className={className} alt={alt} {...rest}/>}
+      fallback={<MP5Vector alt={alt} />}
       className={className} 
       alt={alt} 
       style={style}
@@ -242,7 +268,7 @@ export const MP5Icon: React.FC<WeaponIconWrapperProps> = ({ className, style, al
 export const RifleIcon: React.FC<WeaponIconWrapperProps> = ({ className, style, alt, ...rest }) => (
     <WeaponIcon 
       imagePaths={ASSETS.WEAPON_RIFLE}
-      fallback={<RifleVector className={className} alt={alt} {...rest}/>}
+      fallback={<RifleVector alt={alt} />}
       className={className} 
       alt={alt} 
       style={style}
@@ -254,7 +280,19 @@ export const RifleIcon: React.FC<WeaponIconWrapperProps> = ({ className, style, 
 export const ShotgunIcon: React.FC<WeaponIconWrapperProps> = ({ className, style, alt, ...rest }) => (
     <WeaponIcon 
       imagePaths={ASSETS.WEAPON_SHOTGUN}
-      fallback={<ShotgunVector className={className} alt={alt} {...rest}/>}
+      fallback={<ShotgunVector alt={alt} />}
+      className={className} 
+      alt={alt} 
+      style={style}
+      {...rest}
+    />
+);
+
+// [NEW] GrenadeIcon 컴포넌트를 `export`합니다.
+export const GrenadeIcon: React.FC<WeaponIconWrapperProps> = ({ className, style, alt, ...rest }) => (
+    <WeaponIcon 
+      imagePaths={ASSETS.ICON_GRENADE}
+      fallback={<GrenadeVector alt={alt} />}
       className={className} 
       alt={alt} 
       style={style}

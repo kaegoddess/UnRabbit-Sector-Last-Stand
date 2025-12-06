@@ -96,6 +96,13 @@ export interface Player extends Entity {
   isQuickReloadAttempted: boolean; // 현재 재장전 주기 동안 빠른 재장전을 시도했는지 여부 (한 번만 적용)
   quickReloadCooldownTimer: number; // 빠른 재장전 성공 후 발사 방지 쿨다운 타이머
   isQuickReloadFailed: boolean; // [NEW] 빠른 재장전 실패로 인한 입력 잠금 상태 (탄피형 재장전용)
+
+  // [NEW] 수류탄 능력 관련 상태
+  grenadeCooldown: number; // 남은 재사용 대기시간 (초)
+  maxGrenadeCooldown: number; // 최대 재사용 대기시간 (초, 레벨에 따라 변동)
+  grenadeLevel: number;
+  grenadeXp: number;
+  grenadeMaxXp: number;
 }
 
 export interface Zombie extends Entity {
@@ -144,6 +151,35 @@ export interface Particle extends Entity {
   growth?: number; 
 }
 
+// [NEW] 수류탄 엔티티 타입 정의
+export interface Grenade extends Entity {
+  z: number;      // 높이
+  vz: number;     // 수직 속도
+  velocity: Vector; // 수평 속도
+  life: number;   // 폭발까지 남은 시간
+  state: 'flying' | 'rolling'; // 현재 상태
+  // 현재 레벨에 맞는 스탯
+  stats: {
+    damage: number;
+    radius: number;
+    knockback: number;
+  };
+}
+
+// [NEW] 폭발 시각 효과를 위한 엔티티 타입 정의
+export interface ExplosionEffect extends Entity {
+  life: number;
+  maxLife: number;
+  // 여러 개의 동심원을 그려 다층적인 폭발 효과를 만듭니다.
+  rings: {
+    radius: number;     // 현재 반지름
+    maxRadius: number;  // 최대 반지름
+    startDelay: number; // 애니메이션 시작 전 지연 시간 (초)
+    width: number;      // 선의 두께
+  }[];
+}
+
+
 export interface Shell extends Entity {
   z: number;      
   vz: number;     
@@ -190,4 +226,7 @@ export interface GameStats {
   maxXp: number;
   stamina: number;
   maxStamina: number;
+  // [NEW] 수류탄 UI를 위한 정보 추가
+  grenadeCooldown: number;
+  maxGrenadeCooldown: number;
 }

@@ -56,6 +56,7 @@ export const GAME_TEXT = {
       { action: "재장전", keys: "R" },
       { action: "전력질주", keys: "Shift (누르기)" },
       { action: "닷지", keys: "Space" },
+      { action: "수류탄", keys: "Q" },
     ],
     // 캐릭터 이미지 로딩 중일 때
     LINKING: "연결 중...",

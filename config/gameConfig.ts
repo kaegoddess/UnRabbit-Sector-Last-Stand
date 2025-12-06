@@ -44,6 +44,10 @@ export const SOUND_SETTINGS = {
 
     shellLoad: { src: 'sound/shell_load.mp3', volume: 0.6 },
     dryFire:   { src: 'sound/dry_fire.mp3',   volume: 0.7 },
+
+    // [NEW] 수류탄 사운드 추가
+    grenadeThrow: { src: 'sound/grenade_throw.mp3', volume: 0.8 },
+    grenadeExplode: { src: 'sound/grenade_explode.mp3', volume: 1.2 },
   }
 };
 
